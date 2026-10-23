@@ -1,0 +1,26 @@
+/* dot-icon: inlined dotted icon + active country card background. */
+svg.report-card_icon {
+  overflow: visible;
+}
+
+svg.report-card_icon circle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.home-card.cc-country {
+  cursor: pointer;
+  transition:
+    background-color 400ms ease,
+    border-color 400ms ease;
+}
+
+.home-card.cc-country:has(.report-card_go.cc-active) {
+  background-color: var(--_color---secondary--bright-blue-light);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-card.cc-country {
+    transition: none;
+  }
+}

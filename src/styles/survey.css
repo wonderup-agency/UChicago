@@ -1,0 +1,57 @@
+/* survey: step swap and progress bar motion.
+   Step visibility (.survey_step / .cc-active) lives in Webflow. */
+.survey_bar {
+  transform-origin: 0% 50%;
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.survey_step.cc-active {
+  animation: survey-step-in 350ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.survey_step.is-leaving {
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity 280ms ease,
+    transform 280ms ease;
+}
+
+.survey_options .button {
+  transition:
+    background-color 250ms ease,
+    color 250ms ease,
+    border-color 250ms ease,
+    transform 200ms ease;
+}
+
+.survey_options .button:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes survey-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .survey_bar,
+  .survey_step.is-leaving,
+  .survey_options .button {
+    transition: none;
+  }
+
+  .survey_step.cc-active {
+    animation: none;
+  }
+
+  .survey_options .button:hover {
+    transform: none;
+  }
+}

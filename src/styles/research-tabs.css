@@ -1,0 +1,35 @@
+/* research-tabs: pane entrance and tab hover nudge.
+   Visibility (.research_pane / .cc-active) and the active tab look live in Webflow. */
+.research_pane.cc-active {
+  animation: research-pane-in 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.research_tab-icon {
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.research_tab:hover .research_tab-icon,
+.research_tab.cc-active .research_tab-icon {
+  transform: translate(2px, -2px);
+}
+
+@keyframes research-pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .research_pane.cc-active {
+    animation: none;
+  }
+
+  .research_tab-icon {
+    transition: none;
+  }
+}

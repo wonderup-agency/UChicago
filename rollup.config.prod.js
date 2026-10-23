@@ -1,4 +1,4 @@
-import { readdirSync, accessSync } from 'node:fs'
+import { readdirSync, accessSync, readFileSync } from 'node:fs'
 import { defineConfig } from 'rollup'
 import del from 'rollup-plugin-delete'
 import terser from '@rollup/plugin-terser'
@@ -37,6 +37,29 @@ function checkGlobalJs() {
   }
 }
 
+// Emits src/data/*.json as dist/data/*.json (fetched at runtime, kept out of the bundle)
+function copyData() {
+  return {
+    name: 'copy-data',
+    generateBundle() {
+      let files = []
+      try {
+        files = readdirSync('src/data').filter((f) => f.endsWith('.json'))
+      } catch {
+        return
+      }
+      files.forEach((f) => {
+        this.addWatchFile(`src/data/${f}`)
+        this.emitFile({
+          type: 'asset',
+          fileName: `data/${f}`,
+          source: readFileSync(`src/data/${f}`),
+        })
+      })
+    },
+  }
+}
+
 export default defineConfig({
   input: {
     main: 'src/main.js',
@@ -52,6 +75,7 @@ export default defineConfig({
   plugins: [
     del({ targets: 'dist/*' }),
     checkGlobalJs(),
+    copyData(),
     resolve(),
     commonjs(),
     postcss({

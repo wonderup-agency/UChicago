@@ -1,0 +1,31 @@
+/* Card hover states driven by the parent card (Webflow can't target them).
+   Imported globally from global.js. */
+/* Conference cards: the go circle fills on hover */
+.home-card.cc-event .report-card_go {
+  transition:
+    background-color 300ms ease,
+    border-color 300ms ease,
+    color 300ms ease;
+}
+
+.home-card.cc-event:hover .report-card_go {
+  background-color: var(--_color---primary--maroon);
+  border-color: var(--_color---primary--maroon);
+  color: var(--_color---neutral--white);
+}
+
+.home-card.cc-event:hover .report-card_go-icon,
+.home-card.cc-country:hover .report-card_go-icon {
+  transform: translate(2px, -2px);
+}
+
+.report-card_go-icon {
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-card.cc-event .report-card_go,
+  .report-card_go-icon {
+    transition: none;
+  }
+}
