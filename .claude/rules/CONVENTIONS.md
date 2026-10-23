@@ -5,7 +5,7 @@
 - ES modules everywhere (`import`/`export`), never CommonJS (`require`/`module.exports`)
 - `type: "module"` is set in package.json
 - 2-space indentation
-- Prettier defaults for all formatting (no config file, `.prettierignore` excludes `dist`)
+- Prettier defaults for all formatting (no config file, `.prettierignore` excludes `dist`, `**/*.md` and `prototype`)
 
 ## Naming
 
@@ -65,6 +65,7 @@ Components are registered in `src/components.js` as an array of `{ selector, imp
 - PostCSS handles nesting and autoprefixer (stage 2)
 - All CSS extracts to a single `dist/styles.css`
 - No CSS-in-JS, no CSS modules
+- **Global styles** (site-wide, e.g. button hover states) live in `src/styles/` and are imported once from `global.js`. They only add behavior Webflow classes can't express (parent-hover, keyframes); the base look stays in Webflow classes/variables
 
 ## Error Handling
 

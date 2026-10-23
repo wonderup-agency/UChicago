@@ -6,7 +6,9 @@
 │   ├── components.js              Component registry (auto-managed by create-component)
 │   ├── config.js                  Shared project config (API keys, endpoints, flags)
 │   ├── components/
-│   │   └── global.js              Runs on every page before components load
+│   │   └── global.js              Runs on every page before components load (imports global styles)
+│   ├── styles/
+│   │   └── buttons.css            Button hover micro-interactions (Figma Button States)
 │   └── pages/
 │       └── .gitkeep               Per-page standalone bundles go here
 │
@@ -19,6 +21,12 @@
 │   └── workflows/
 │       ├── setup.yml              Auto-patches repo name on first push (self-deletes after)
 │       └── purge-cdn.yml          Purges jsDelivr CDN cache after every push to main that touches dist/
+│
+├── prototype/
+│   └── particle-lab/              Reference prototype of the homepage particle field (not bundled, excluded from Prettier)
+│
+├── docs/
+│   └── migration-prompt.md        Two-phase Claude Code prompt for the Figma → Webflow migration
 │
 ├── scripts/
 │   ├── setup.js                   One-time project initialisation (repo name, CDN URLs)
@@ -41,7 +49,7 @@
 ├── rollup.config.dev.js           Dev build config (sourcemaps, no minification)
 ├── rollup.config.prod.js          Prod build config (minified, no console)
 ├── eslint.config.js               ESLint flat config
-├── .prettierignore                Excludes dist/ from Prettier formatting
+├── .prettierignore                Excludes dist/, markdown and prototype/ from Prettier formatting
 ├── package.json                   Dependencies, scripts, project metadata
 ├── webflow-snippet.html           Copy-paste snippet for Webflow head section
 ├── CLAUDE.md                      Project instructions for Claude
@@ -61,7 +69,10 @@
 | Nested page bundle     | `src/pages/<section>/<name>.js` (e.g., `blog/post.js`)        |
 | Project config         | `src/config.js`                                               |
 | CSS                    | Import in any JS file — extracts to `dist/styles.css`         |
+| Global CSS             | `src/styles/<name>.css`, imported from `global.js`            |
 | Node scripts           | `scripts/`                                                    |
 | Component docs         | `.claude/rules/components/<name>.md`                          |
 | Page docs              | `.claude/rules/pages/<name>.md`                               |
 | Architecture docs      | `.claude/rules/`                                              |
+| Reference prototypes   | `prototype/<name>/` (never imported by `src/`)                |
+| Working docs / prompts | `docs/`                                                       |

@@ -51,6 +51,8 @@ An array of `{ selector, importFn }` objects. The selector uses `data-component`
 
 Loaded before any components. Runs on every page regardless of data attributes. Use for analytics, global event listeners, shared setup.
 
+It also imports the global stylesheets in `src/styles/` (currently `buttons.css`: hover/focus micro-interactions for the Webflow `.button` + `.btn-icon` classes). Because these imports happen in `global.js`, the CSS is extracted into `dist/styles.css`, which the site-wide snippet always loads.
+
 ### Lifecycle
 
 - **Init**: The default function body (runs once on load, after DOMContentLoaded)
