@@ -1,0 +1,380 @@
+<title>UChicago Particle Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one fixed WebGL particle field behind a faithful build of the UChicago homepage (Figma V1). Sections are transparent so the field can travel through them. */
+  :root {
+    --bg: #ffffff;
+    --ink: #1b2033;
+    --ink-2: #4b5468;
+    --muted: #8c94a6;
+    --maroon: #800000;
+    --maroon-deep: #4a0000;
+    --dot: #7ea0f0;
+    --tint: #eef4ff;
+    --line: #dde6f8;
+    --font: "Inter", "Helvetica Neue", Arial, sans-serif;
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body { font-family: var(--font); font-size: 16px; line-height: 1.5; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; }
+  main { position: relative; z-index: 1; }
+  .wrap { width: 100%; max-width: 1440px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px), min(40px, 2.8vw)); padding-right: max(16px, env(safe-area-inset-right, 0px), min(40px, 2.8vw)); }
+  h1, h2, h3, p { margin: 0; }
+  h2 { font-weight: 400; font-size: clamp(30px, 3.35vw, 48px); line-height: 1.12; letter-spacing: -0.02em; text-wrap: balance; }
+  .tag { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  .tag::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--maroon); }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--dot); outline-offset: 3px; border-radius: 6px; }
+
+  /* ---------- arrow micro-interaction (shared) ---------- */
+  .arr { position: relative; display: inline-block; width: 16px; height: 16px; overflow: hidden; flex: none; }
+  .arr::before, .arr::after { content: ""; position: absolute; inset: 0; background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 11.5l7-7M5.5 4.5h6v6' fill='none' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E") center/contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 11.5l7-7M5.5 4.5h6v6' fill='none' stroke='black' stroke-width='1.6'/%3E%3C/svg%3E") center/contain no-repeat;
+    transition: transform .45s cubic-bezier(.6,0,.2,1); }
+  .arr::after { transform: translate(-110%, 110%); }
+  .hov:hover .arr::before, .hov:focus-visible .arr::before { transform: translate(110%, -110%); }
+  .hov:hover .arr::after, .hov:focus-visible .arr::after { transform: translate(0, 0); }
+  .link { display: inline-flex; align-items: center; gap: 8px; color: var(--maroon); font-size: 17px; font-weight: 500; }
+  .link span:first-child { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .4s; }
+  .link:hover span:first-child { background-size: 100% 1px; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; padding: 12px 22px; font-size: 17px; font-weight: 500; border: 1px solid #e6c9c9; color: var(--maroon); background: rgba(255,255,255,.85); cursor: pointer; transition: background .3s, border-color .3s, color .3s; }
+  .btn:hover { background: #fff5f5; border-color: var(--maroon); }
+  .btn.primary { background: var(--maroon); color: #fff; border-color: var(--maroon); }
+  .btn.primary:hover { background: #650000; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; height: clamp(640px, 62.5vw, 1000px); display: grid; place-items: center; text-align: center; }
+  .hello { position: absolute; top: 0; left: 0; right: 0; background: var(--maroon); color: #fff; font-size: 12px; text-align: center; padding-block: 9px; padding-inline: 16px; letter-spacing: .02em; }
+  .hello a { text-decoration: underline; text-underline-offset: 2px; }
+  .nav { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); width: min(1023px, calc(100% - 32px)); display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 8px 8px 8px 22px; background: rgba(255,255,255,.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 999px; z-index: 3; }
+  .brand { display: grid; line-height: 1.05; text-align: left; }
+  .brand b { font-weight: 600; font-size: 15px; }
+  .brand span { font-size: 11px; color: var(--ink-2); letter-spacing: .02em; }
+  .navlinks { display: flex; gap: 20px; font-size: 14px; color: var(--ink-2); }
+  .navlinks a { position: relative; padding-block: 4px; transition: color .25s; }
+  .navlinks a::after { content: ""; position: absolute; left: 50%; bottom: -4px; width: 4px; height: 4px; border-radius: 50%; background: var(--maroon); transform: translateX(-50%) scale(0); transition: transform .3s; }
+  .navlinks a:hover { color: var(--ink); }
+  .navlinks a:hover::after { transform: translateX(-50%) scale(1); }
+  .pill { background: var(--maroon); color: #fff; border-radius: 999px; padding: 8px 16px; font-size: 14px; white-space: nowrap; transition: background .3s; }
+  .pill:hover { background: #650000; }
+  @media (max-width: 980px) { .navlinks { display: none; } }
+  .hero-c { max-width: 896px; padding-inline: 16px; padding-top: 40px; }
+  .hero h1 { font-weight: 400; font-size: clamp(36px, 4.45vw, 64px); line-height: 1.05; letter-spacing: -0.025em; text-wrap: balance; }
+  .hero p { margin: 22px auto 30px; color: var(--ink-2); font-size: clamp(17px, 1.65vw, 24px); line-height: 1.35; max-width: 22em; text-wrap: balance; }
+  .btns { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+
+  /* ---------- about ---------- */
+  .about { min-height: 62.5vw; max-height: 900px; display: grid; align-items: center; padding-block: 120px; }
+  .about .grid { display: grid; grid-template-columns: 443fr 245fr 672fr; gap: 0; }
+  .about .grid > :first-child { grid-column: 1; }
+  .about .grid > :last-child { grid-column: 3; display: grid; gap: 20px; color: var(--ink); font-size: 18px; line-height: 1.45; }
+  .about h2 { margin-top: 24px; }
+  @media (max-width: 860px) { .about { min-height: 0; } .about .grid { grid-template-columns: 1fr; gap: 32px; } .about .grid > :last-child { grid-column: 1; } }
+
+  .divider { height: 218px; }
+  .divider.tall { height: 418px; }
+
+  /* ---------- section head ---------- */
+  .shead { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+  .shead h2 { margin-top: 24px; max-width: 670px; }
+  section.block { padding-block: 100px; }
+
+  /* ---------- research ---------- */
+  .research .grid { margin-top: 80px; display: grid; grid-template-columns: 326fr 72fr 454fr 72fr 436fr; align-items: end; }
+  .tabs { grid-column: 1; display: grid; }
+  .tab { display: flex; justify-content: space-between; align-items: center; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 18px 0; font-size: 18px; color: #a3abbb; cursor: pointer; transition: color .3s, padding .3s; }
+  .tab:last-child { border-bottom: 0; }
+  .tab .arr { transition: color .3s; }
+  .tab:hover { color: var(--ink-2); padding-left: 6px; }
+  .tab[aria-selected="true"] { color: var(--ink); font-size: 20px; }
+  .rcard { grid-column: 3; height: 566px; border-radius: 22px; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.96) 35%, #e6efff 100%); padding: 40px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+  .rcard .k { font-size: 12px; letter-spacing: .08em; color: var(--ink-2); text-transform: uppercase; }
+  .rcard h3 { font-weight: 400; font-size: 28px; margin: 40px 0 20px; letter-spacing: -0.01em; }
+  .rcard p { color: var(--ink-2); font-size: 16px; line-height: 1.55; }
+  .rcard .swap { transition: opacity .35s, transform .35s; }
+  .rcard .swap.out { opacity: 0; transform: translateY(8px); }
+  .rside { grid-column: 5; display: grid; gap: 40px; }
+  #resGraphic { width: 160px; height: 160px; }
+  .quote { font-size: 22px; line-height: 1.4; letter-spacing: -0.005em; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .stat b { display: block; font-weight: 400; font-size: clamp(40px, 3.6vw, 52px); color: var(--maroon); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .stat span { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+  .eg { font-size: 11px; color: var(--muted); }
+  @media (max-width: 1100px) { .research .grid { grid-template-columns: 1fr 1fr; gap: 32px; } .tabs, .rcard, .rside { grid-column: auto; } .rcard { height: auto; min-height: 420px; } }
+  @media (max-width: 700px) { .research .grid { grid-template-columns: 1fr; } }
+
+  /* ---------- products ---------- */
+  .products .grid { margin-top: 60px; display: grid; grid-template-columns: 788fr 532fr; gap: 40px; }
+  .pcard { border-radius: 22px; border: 1px solid var(--line); background: #fff; padding: 40px; min-width: 0; }
+  .pcard h3 { font-weight: 400; font-size: 26px; line-height: 1.3; margin: 24px 0 18px; }
+  .pcard p { color: var(--ink-2); font-size: 15px; line-height: 1.6; }
+  .ktag { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  .ktag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--maroon); }
+  .survey-card { background: radial-gradient(120% 80% at 50% 100%, #dbe7ff 0%, #fff 60%); padding-bottom: 0; overflow: hidden; }
+  .survey { margin: 40px 2px 0; background: rgba(255,255,255,.8); border: 1px solid var(--line); border-bottom: 0; border-radius: 18px 18px 0 0; padding: 40px 40px 44px; text-align: center; position: relative; min-height: 268px; }
+  .survey .q { font-size: 26px; line-height: 1.3; transition: opacity .3s, transform .3s; position: relative; display: inline-block; }
+  .survey .q::before { content: ""; position: absolute; left: -18px; top: 6px; bottom: 6px; width: 1px; background: var(--maroon); animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .survey .opts { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 36px; transition: opacity .3s, transform .3s; }
+  .survey .opt { border: 1px solid #e6c9c9; color: var(--maroon); background: #fff; border-radius: 999px; padding: 13px 22px; font-size: 16px; cursor: pointer; transition: background .25s, color .25s, transform .2s, border-color .25s; }
+  .survey .opt:hover { border-color: var(--maroon); transform: translateY(-2px); }
+  .survey .opt[aria-pressed="true"] { background: var(--maroon); color: #fff; border-color: var(--maroon); }
+  .survey .prog { position: absolute; top: 16px; right: 20px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .survey .bar { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--maroon); transform-origin: left; transform: scaleX(.2); transition: transform .5s; border-radius: 2px; }
+  .survey .fade { opacity: 0; transform: translateY(10px); }
+  @media (max-width: 900px) { .products .grid { grid-template-columns: 1fr; } }
+
+  /* ---------- maps ---------- */
+  .maps .shead p { max-width: 430px; text-align: right; color: var(--ink); font-size: 16px; }
+  .maps .side { display: grid; justify-items: end; gap: 20px; }
+  .mapcard { margin-top: 60px; border-radius: 26px; border: 1px solid var(--line); background: #fff; overflow: hidden; position: relative; }
+  .mapbar { display: flex; align-items: center; gap: 12px; padding: 22px 32px; font-size: 16px; }
+  .mapbar button { background: none; border: 0; padding: 0; font-size: 16px; color: var(--ink-2); cursor: pointer; transition: color .25s; }
+  .mapbar button[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+  .mapbar .sep { width: 1px; height: 20px; background: var(--ink); }
+  .mapbar .eg { margin-left: auto; }
+  .mapsvg { display: block; width: 100%; height: auto; }
+  .mapsvg .c { fill: #e7effc; stroke: #fff; stroke-width: .8; transition: fill .3s; }
+  .mapsvg .c.h { fill: #d5e3fa; }
+  .mapsvg .c:hover { fill: #c6d8f7; }
+  .mapsvg .grat { fill: none; stroke: #e8eef9; stroke-width: 1; }
+  .city { cursor: pointer; }
+  .city circle.dot { transition: r .6s cubic-bezier(.3,1.4,.5,1), fill .6s; }
+  .city circle.ring { fill: none; stroke-width: 1.5; opacity: 0; transform-box: fill-box; transform-origin: center; }
+  .city:hover circle.ring, .city.on circle.ring { animation: pulse 1.6s ease-out infinite; }
+  @keyframes pulse { from { opacity: .7; transform: scale(1); } to { opacity: 0; transform: scale(2.6); } }
+  .city text { font-size: 13px; fill: var(--ink-2); pointer-events: none; transition: fill .3s; }
+  .city text.v { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .city:hover text.n { fill: var(--ink); }
+  .tip { position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: 13px; box-shadow: 0 10px 30px rgba(30,60,140,.12); opacity: 0; transform: translate(-50%, calc(-100% - 14px)); transition: opacity .2s; white-space: nowrap; }
+  .tip b { display: block; font-size: 15px; }
+
+  /* ---------- country reports ---------- */
+  .reports .row { margin-top: 80px; display: flex; gap: 24px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 12px; scrollbar-width: thin; }
+  .ccard { flex: 0 0 min(411px, 82vw); scroll-snap-align: start; border-radius: 22px; border: 1px solid var(--line); background: #fff; padding: 40px; display: grid; gap: 0; position: relative; overflow: hidden; transition: background .4s, border-color .4s; cursor: pointer; }
+  .ccard:hover, .ccard.active { background: linear-gradient(160deg, #f4f8ff 0%, #e9f1ff 100%); border-color: #cfdcf6; }
+  .ccard .ico { width: 120px; height: 120px; display: flex; align-items: center; justify-content: flex-start; }
+  .ccard .ico svg { overflow: visible; }
+  .ccard .ico circle { transition: transform 1.1s cubic-bezier(.22,.61,.36,1); transform-box: fill-box; transform-origin: center; }
+  .ccard .go { position: absolute; top: 40px; right: 40px; width: 38px; height: 38px; border-radius: 50%; border: 1px solid #e6c9c9; color: var(--maroon); display: grid; place-items: center; transition: background .3s, color .3s, border-color .3s; }
+  .ccard:hover .go, .ccard.active .go { background: var(--maroon); color: #fff; border-color: var(--maroon); }
+  .ccard h3 { font-weight: 400; font-size: 26px; margin-top: 40px; }
+  .ccard .evi { font-size: 14px; color: var(--ink-2); margin-top: 6px; letter-spacing: .03em; font-variant-numeric: tabular-nums; }
+  .ccard p { color: var(--ink-2); font-size: 14px; line-height: 1.6; margin: 22px 0 28px; }
+
+  /* ---------- team ---------- */
+  .team .card { border-radius: 26px; border: 1px solid var(--line); min-height: 532px; padding: 40px; display: grid; align-content: center; position: relative; }
+  .team h2 { margin: 24px 0 24px; max-width: 520px; }
+  .team p { color: var(--ink-2); max-width: 480px; font-size: 18px; margin-bottom: 40px; }
+
+  /* ---------- conferences ---------- */
+  .conf .grid { margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .ecard { border-radius: 22px; border: 1px solid var(--line); background: #fff; padding: 40px; position: relative; transition: background .4s; }
+  .ecard:hover { background: linear-gradient(160deg, #f6f9ff 0%, #e8f0ff 100%); }
+  .ecard .meta { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); }
+  .ecard h3 { font-weight: 400; font-size: 24px; line-height: 1.3; margin: 18px 70px 20px 0; }
+  .ecard .who { color: var(--ink-2); font-size: 17px; }
+  .ecard .org { color: var(--muted); font-size: 15px; margin: 12px 0 40px; }
+  .ecard .go { position: absolute; top: 32px; right: 32px; width: 38px; height: 38px; border-radius: 50%; border: 1px solid #e6c9c9; color: var(--maroon); display: grid; place-items: center; transition: background .3s, color .3s; }
+  .ecard:hover .go { background: var(--maroon); color: #fff; }
+  @media (max-width: 800px) { .conf .grid { grid-template-columns: 1fr; } }
+
+  /* ---------- news + footer ---------- */
+  .news { background: #edf3ff; border-radius: 0 0 26px 26px; position: relative; z-index: 2; padding-block: 80px; margin-top: 60px; }
+  .news h2 .w { color: #b9c6dd; transition: color .4s; }
+  .news h2 .w.lit { color: var(--ink); }
+  .rows { margin-top: 40px; }
+  .nrow { display: grid; grid-template-columns: 44px 1fr 330px 160px; align-items: center; padding: 30px 0; border-bottom: 1px solid #d6e1f5; transition: padding .35s, background .35s; position: relative; }
+  .nrow::before { content: ""; position: absolute; inset: 0 -20px; background: #fff; border-radius: 14px; opacity: 0; transition: opacity .35s; z-index: -1; }
+  .nrow:hover { padding-left: 12px; }
+  .nrow:hover::before { opacity: .6; }
+  .nrow .i { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .nrow .t { font-size: 18px; color: var(--ink-2); transition: color .3s; }
+  .nrow:hover .t { color: var(--ink); }
+  .nrow .d { color: var(--ink-2); font-size: 17px; }
+  .nrow .link { justify-self: end; font-size: 16px; }
+  .new { display: inline-block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--maroon); background: #fde3e3; border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
+  @media (max-width: 800px) { .nrow { grid-template-columns: 34px 1fr; gap: 6px; } .nrow .d, .nrow .link { grid-column: 2; justify-self: start; } }
+  footer { background: var(--maroon-deep); color: #fff; margin-top: -26px; padding-top: 86px; position: relative; z-index: 1; overflow: hidden; }
+  .fnews { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; padding-bottom: 46px; border-bottom: 1px solid rgba(255,255,255,.18); }
+  .fnews h3 { font-weight: 400; font-size: 22px; }
+  .fnews p { font-size: 13px; color: rgba(255,255,255,.7); margin-top: 10px; max-width: 330px; }
+  .fform { display: flex; gap: 8px; }
+  .fform input { flex: 1; min-width: 0; background: transparent; border: 1px solid rgba(255,255,255,.35); border-radius: 999px; color: #fff; padding: 12px 18px; font: inherit; font-size: 15px; transition: border-color .3s, background .3s; }
+  .fform input::placeholder { color: rgba(255,255,255,.6); }
+  .fform input:focus { outline: none; border-color: #fff; background: rgba(255,255,255,.06); }
+  .fform button { background: #fff; color: var(--maroon-deep); border: 0; border-radius: 999px; padding: 0 20px; font-size: 15px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+  .fsmall { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 8px; }
+  .fcols { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 24px; padding-block: 48px; font-size: 13px; }
+  .fcols h4 { margin: 0 0 14px; font-weight: 600; font-size: 13px; }
+  .fcols a { display: block; color: rgba(255,255,255,.75); padding-block: 4px; transition: color .25s, transform .25s; }
+  .fcols a:hover { color: #fff; transform: translateX(3px); }
+  .word { font-size: clamp(56px, 13.4vw, 196px); line-height: 1; letter-spacing: -0.035em; white-space: nowrap; padding-block: 10px 40px; display: flex; color: #f3f5ff; user-select: none; }
+  .word span { display: inline-block; transition: transform .5s cubic-bezier(.3,1.6,.5,1), color .4s; }
+  .word span:hover { transform: translateY(-14px); color: #fff; }
+  .copy { border-top: 1px solid rgba(255,255,255,.18); padding-block: 24px 36px; font-size: 12px; color: rgba(255,255,255,.65); }
+  @media (max-width: 800px) { .fnews, .fcols { grid-template-columns: 1fr; } }
+
+  /* ---------- hud ---------- */
+  .hud { position: fixed; z-index: 20; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px)); font: 11px/1.5 ui-monospace, Menlo, monospace; color: var(--ink); background: rgba(255,255,255,.9); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-variant-numeric: tabular-nums; }
+  .hud b { color: var(--maroon); font-weight: 500; }
+  @media (max-width: 600px) { .hud { display: none; } }
+  .lil-gui.root { z-index: 21; top: calc(10px + env(safe-area-inset-top, 0px)) !important; right: max(10px, env(safe-area-inset-right, 0px)) !important; }
+  @media (prefers-reduced-motion: reduce) { .arr::before, .arr::after, .word span, .survey .q::before { transition: none; animation: none; } }
+</style>
+
+<canvas id="gl" aria-hidden="true"></canvas>
+
+<main>
+  <section class="hero" id="hero" data-p="hero">
+    <div class="hello">Entrepreneurship Research Lab at the <a href="https://www.chicagobooth.edu/" target="_blank" rel="noopener">University of Chicago Booth School of Business</a></div>
+    <nav class="nav" aria-label="Main">
+      <a class="brand" href="#hero"><b>Entrepreneurship</b><span>Research Lab</span></a>
+      <div class="navlinks"><a href="#research">Research</a><a href="#products">Data &amp; Method</a><a href="#team">People</a><a href="#maps">Digital Maps</a><a href="#reports">Reports</a><a href="#products">Benchmark</a><a href="#conf">Events</a><a href="#news">News</a></div>
+      <a class="pill" href="#footer">Get in touch</a>
+    </nav>
+    <div class="hero-c">
+      <h1>The Lab for global, data-driven research on entrepreneurship</h1>
+      <p>Built for academics, operators, investors, and policy-makers.</p>
+      <div class="btns">
+        <a class="btn primary hov" href="#maps"><span>Access the Data Portal</span><i class="arr"></i></a>
+        <a class="btn hov" href="#about"><span>Learn more</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="about wrap" id="about">
+    <div class="grid">
+      <div><span class="tag">Our mission</span><h2>Mapping how ideas become economies</h2></div>
+      <div>
+        <p>From Silicon Valley to Nairobi and beyond, we study what startups need to scale, how investors find opportunity, and how institutions and networks shape the world’s next entrepreneurial hubs.</p>
+        <p>Our Lab builds uniquely broad, globally distributed data and combines it with economic experiments and close partnerships with founders, investors, companies, and governments.</p>
+        <div><a class="btn hov" href="#research"><span>About the lab</span><i class="arr"></i></a></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider" id="div1" data-p="band" data-dir="1" aria-hidden="true"></div>
+
+  <section class="block research wrap" id="research">
+    <div class="shead">
+      <div><span class="tag">Research</span><h2>What the evidence shows, region by region</h2></div>
+      <a class="link hov" href="#research"><span>All research</span><i class="arr"></i></a>
+    </div>
+    <div class="grid">
+      <div class="tabs" role="tablist" aria-label="Regions" id="tabs"></div>
+      <article class="rcard" role="tabpanel" id="rcard">
+        <div class="swap"><div class="k" id="rk">Published paper</div><h3 id="rt">Startups in Africa</h3><p id="rd"></p></div>
+        <a class="link hov" href="#research"><span>Read the research</span><i class="arr"></i></a>
+      </article>
+      <div class="rside">
+        <div id="resGraphic" data-p="research" aria-hidden="true"></div>
+        <p class="quote swap" id="rq"></p>
+        <div class="stats">
+          <div class="stat"><b data-count id="s1">4,444</b><span id="s1l">Founders surveyed across 51 countries</span></div>
+          <div class="stat"><b data-count id="s2">80%</b><span id="s2l">of VC deals involve a foreign investor</span></div>
+        </div>
+        <span class="eg" id="reg-eg" hidden>Contenido de ejemplo para este tab</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider tall" id="div2" data-p="band" data-dir="-1" aria-hidden="true"></div>
+
+  <section class="block products wrap" id="products" data-p="dust">
+    <div class="shead"><div><span class="tag">Data-driven products</span><h2>Delivering insights into high-growth ecosystems</h2></div></div>
+    <div class="grid">
+      <article class="pcard survey-card">
+        <span class="ktag">Benchmark / Surveys</span>
+        <h3>Compare yourself to 1,848 global investors</h3>
+        <p>Our Global Private Capital Investors survey, run with the IFC, covers VC, PE, and angel investors across 108 countries managing nearly $2 trillion. Answer five quick questions and see exactly where you stand among your peers.</p>
+        <div class="survey" id="survey">
+          <i class="bar" id="sbar"></i><span class="prog" id="sprog">1 / 5</span>
+          <div class="q" id="sq">What type of investor are you?</div>
+          <div class="opts" id="sopts"></div>
+        </div>
+      </article>
+      <article class="pcard">
+        <span class="ktag">Country reports</span>
+        <h3>A full ecosystem report for any country</h3>
+        <p>Regulatory framework, public support programs, ecosystem organizations, and events — assembled automatically from the lab's structured databases, and regenerated whenever the data updates.</p>
+        <p style="margin-top:40px"><a class="link hov" href="#reports"><span>Generate report</span><i class="arr"></i></a></p>
+      </article>
+    </div>
+  </section>
+
+  <section class="block maps wrap" id="maps" data-p="dust">
+    <div class="shead">
+      <div><span class="tag">Digital maps</span><h2>Explore where high-growth entrepreneurship thrives</h2></div>
+      <div class="side"><p>16 pilot ecosystems scored across <b>6 pillars</b> and <b>30 sourced measures</b> — each with its definition, source, and 8-year trend.</p><a class="link hov" href="#maps"><span>Explore the atlas</span><i class="arr"></i></a></div>
+    </div>
+    <div class="mapcard" id="mapcard">
+      <div class="mapbar">
+        <button type="button" id="mA" aria-pressed="true">Active Unicorns</button><i class="sep"></i><button type="button" id="mB" aria-pressed="false">Startup Activity</button>
+        <span class="eg" id="mEg" hidden>Startup Activity: valores de ejemplo</span>
+      </div>
+      <div id="mapwrap"></div>
+      <div class="tip" id="tip"></div>
+    </div>
+  </section>
+
+  <section class="block reports wrap" id="reports" data-p="dust">
+    <div><span class="tag">Country reports</span><h2 style="margin-top:24px">From our country reports</h2></div>
+    <div class="row" id="ccards"></div>
+  </section>
+
+  <section class="block team wrap" id="team">
+    <div class="card" id="teamCard" data-p="team">
+      <div><span class="tag">People</span><h2>Meet the Entrepreneurship Lab team</h2><p>Faculty, research managers, and alumni behind the lab's research and data platforms.</p><a class="link hov" href="#team"><span>Meet the team</span><i class="arr"></i></a></div>
+    </div>
+  </section>
+
+  <section class="block conf wrap" id="conf">
+    <div class="shead"><div><span class="tag">Conferences</span><h2>Where to find us next</h2></div><a class="link hov" href="#conf"><span>All events</span><i class="arr"></i></a></div>
+    <div class="grid">
+      <article class="ecard hov"><div class="meta">July 2026 · Cambridge, MA</div><h3>Summer Institute 2026 — Development Economics</h3><div class="who">Emanuele Colonnelli presenting “Startups in Africa”</div><div class="org">National Bureau of Economic Research</div><a class="link" href="#conf"><span>Register</span><i class="arr"></i></a><span class="go"><i class="arr"></i></span></article>
+      <article class="ecard hov"><div class="meta">July 2026 · Cambridge, MA</div><h3>Summer Institute 2026 — Development Economics</h3><div class="who">Emanuele Colonnelli presenting “Startups in Africa”</div><div class="org">National Bureau of Economic Research</div><a class="link" href="#conf"><span>Register</span><i class="arr"></i></a><span class="go"><i class="arr"></i></span></article>
+    </div>
+  </section>
+
+  <section class="news" id="news" data-p="off">
+    <div class="wrap">
+      <div class="shead"><div><span class="tag">News</span><h2 id="newsH">Latest from the lab</h2></div><a class="link hov" href="#news"><span>All news</span><i class="arr"></i></a></div>
+      <div class="rows">
+        <a class="nrow hov" href="#news"><span class="i">01</span><span><span class="new">New</span><br><span class="t">How Do Emerging Markets Investors Make Decisions?</span></span><span class="d">July 2026</span><span class="link"><span>Read more</span><i class="arr"></i></span></a>
+        <a class="nrow hov" href="#news"><span class="i">02</span><span class="t">"Startups in Africa" released as NBER Working Paper 35261</span><span class="d">May 2026</span><span class="link"><span>Read more</span><i class="arr"></i></span></a>
+        <a class="nrow hov" href="#news"><span class="i">03</span><span class="t">Ecosystem Platform framework takes shape</span><span class="d">April 2026</span><span class="link"><span>Read more</span><i class="arr"></i></span></a>
+      </div>
+    </div>
+  </section>
+
+  <footer id="footer">
+    <div class="wrap">
+      <div class="fnews">
+        <div><h3>Monthly updates from the lab</h3><p>New research, fresh atlas data, and upcoming events — one email a month, straight from the lab.</p></div>
+        <form id="fform"><div class="fform"><label for="femail" class="eg" style="position:absolute;left:-9999px">Email</label><input id="femail" type="email" placeholder="you@university.edu" required><button type="submit" class="hov" id="fbtn"><span>Subscribe</span><i class="arr"></i></button></div><div class="fsmall">Once a month · no spam · unsubscribe anytime</div></form>
+      </div>
+      <div class="fcols">
+        <div><b style="font-weight:500">Entrepreneurship</b><div style="font-size:11px;letter-spacing:.2em">RESEARCH LAB</div><p style="margin-top:18px;color:rgba(255,255,255,.75);max-width:320px">Global, data-driven research on high-growth entrepreneurship, venture capital, and private equity.</p></div>
+        <div><h4>Explore</h4><a href="#research">Research</a><a href="#products">Data &amp; Methods</a><a href="#maps">Digital Maps</a><a href="#reports">Country Reports</a><a href="#team">People</a></div>
+        <div><h4>Lab</h4><a href="#about">About</a><a href="#conf">Events</a><a href="#news">News</a></div>
+        <div><h4>Connect</h4><a href="#footer">Contact</a><a href="#footer">Faculty Director</a><a href="https://www.chicagobooth.edu/" target="_blank" rel="noopener">Chicago Booth</a></div>
+      </div>
+      <div class="word" id="word" aria-label="Chicago Booth"></div>
+      <div class="copy">© 2026 The University of Chicago Booth School of Business</div>
+    </div>
+  </footer>
+</main>
+
+<div class="hud" aria-live="polite">Hero: <b id="hShape">Anillo</b> · Estado: <b id="hState">hero</b><br><span id="hFps">–</span> fps · <span id="hN">–</span> partículas</div>
+
+<script>window.PDATA = __DATA__; window.MAPDATA = __MAP__;</script>
+<script type="module">
+__JS__
+</script>
