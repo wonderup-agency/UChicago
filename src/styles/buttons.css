@@ -23,9 +23,33 @@
   transition-delay: 150ms;
 }
 
-/* Secondary / small / link: the arrow exits top-right and re-enters bottom-left */
-.button:hover .btn-icon:not(.cc-circle) svg,
-.button:focus-visible .btn-icon:not(.cc-circle) svg {
+/* Text links (.cc-link): underline draws in from the left, arrow nudges diagonally */
+.button.cc-link .btn-text {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 100% 100%;
+  background-size: 0% 1px;
+  transition: background-size 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.button.cc-link:hover .btn-text,
+.button.cc-link:focus-visible .btn-text {
+  background-position: 0% 100%;
+  background-size: 100% 1px;
+}
+
+.button.cc-link .btn-arrow {
+  transition: transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.button.cc-link:hover .btn-arrow,
+.button.cc-link:focus-visible .btn-arrow {
+  transform: translate(3px, -3px);
+}
+
+/* Secondary / small buttons: the arrow exits top-right and re-enters bottom-left */
+.button:not(.cc-link):hover .btn-icon:not(.cc-circle) svg,
+.button:not(.cc-link):focus-visible .btn-icon:not(.cc-circle) svg {
   animation: btn-arrow 450ms cubic-bezier(0.6, 0, 0.2, 1);
 }
 
@@ -50,8 +74,13 @@
     transition: none;
   }
 
-  .button:hover .btn-icon:not(.cc-circle) svg,
-  .button:focus-visible .btn-icon:not(.cc-circle) svg {
+  .button:not(.cc-link):hover .btn-icon:not(.cc-circle) svg,
+  .button:not(.cc-link):focus-visible .btn-icon:not(.cc-circle) svg {
     animation: none;
+  }
+
+  .button.cc-link .btn-text,
+  .button.cc-link .btn-arrow {
+    transition: none;
   }
 }
