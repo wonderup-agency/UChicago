@@ -23,7 +23,7 @@
 
 ## Linting & Formatting
 
-- **ESLint** (v9, flat config) — `eslint.config.js` uses `@eslint/js` recommended + `eslint-config-prettier`
+- **ESLint** (v9, flat config) — `eslint.config.js` uses `@eslint/js` recommended + `eslint-config-prettier`. Browser globals are declared explicitly in `languageOptions.globals` (DOM, timers, rAF, observers, `matchMedia`, `localStorage`, `fetch`); add new ones there instead of disabling `no-undef`
 - **Prettier** — default config (no `.prettierrc` file, uses Prettier defaults)
 - Runs automatically before prod builds via `prebuild` script
 
