@@ -38,10 +38,6 @@ export default [
     importFn: () => import('./components/news-reveal.js'),
   },
   {
-    selector: "[data-component='footer-word']",
-    importFn: () => import('./components/footer-word.js'),
-  },
-  {
     // Country report cards: selector is the attribute, not data-component
     selector: '[data-dot-icon]',
     importFn: () => import('./components/dot-icon.js'),

@@ -1,1 +1,0 @@
-function t(t){t.forEach(t=>{const e=t.textContent.trim();t.textContent="",[...e].forEach(e=>{const n=document.createElement("span");n.className="footer_word-char",n.textContent=" "===e?" ":e,t.append(n)})})}export{t as default};
