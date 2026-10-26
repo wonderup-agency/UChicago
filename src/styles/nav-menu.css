@@ -1,0 +1,74 @@
+/* Mobile/tablet nav menu entrance (editorial index).
+   Webflow sets [data-nav-menu-open] on .nav-menu while the menu is open.
+   Layout and look live in Webflow (nav-link, nav-link_num, nav-link_arrow,
+   eyebrow-component cc-menu, nav-menu_footer); this only adds the stagger. */
+@media (max-width: 991px) {
+  .nav-menu[data-nav-menu-open] .nav-menu_container > * {
+    animation: nav-item-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(2) {
+    animation-delay: 40ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(3) {
+    animation-delay: 80ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(4) {
+    animation-delay: 120ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(5) {
+    animation-delay: 160ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(6) {
+    animation-delay: 200ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(7) {
+    animation-delay: 240ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(8) {
+    animation-delay: 280ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(9) {
+    animation-delay: 320ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(10) {
+    animation-delay: 360ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(11) {
+    animation-delay: 400ms;
+  }
+  .nav-menu[data-nav-menu-open] .nav-menu_container > :nth-child(n + 12) {
+    animation-delay: 440ms;
+  }
+
+  .nav-link_arrow {
+    transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .nav-link:hover .nav-link_arrow,
+  .nav-link:active .nav-link_arrow,
+  .nav-link:focus-visible .nav-link_arrow {
+    transform: translate(3px, -3px);
+  }
+}
+
+@keyframes nav-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-menu[data-nav-menu-open] .nav-menu_container > * {
+    animation: none;
+  }
+
+  .nav-link_arrow {
+    transition: none;
+  }
+}
