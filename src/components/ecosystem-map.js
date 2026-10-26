@@ -27,6 +27,15 @@ const LABEL_SIDE = {
   Jakarta: 'b',
   'São Paulo': 'r',
 }
+// Mobile zoom regions (map units, 4:3 to match the mobile canvas)
+const REGIONS = [
+  { key: 'americas', label: 'Americas', box: [110, 200, 460, 345] },
+  { key: 'emea', label: 'Europe & Africa', box: [500, 130, 440, 330] },
+  { key: 'asia', label: 'Asia', box: [860, 200, 400, 300] },
+  { key: 'world', label: 'World', box: null },
+]
+const MOBILE = '(max-width: 767px)'
+
 // Score tiers → brand color tokens and dot radius (map units)
 const tier = (v) =>
   v >= 90
@@ -110,6 +119,68 @@ export default async function (elements) {
     })
     holder.appendChild(svg)
 
+    // ── Mobile: region chips that zoom the viewBox ───────────────────
+    const full = [0, 0, MAP.W, MAP.H]
+    let view = full.slice()
+    let anim = 0
+    const setView = (b) => {
+      view = b
+      svg.setAttribute('viewBox', b.map((n) => n.toFixed(1)).join(' '))
+    }
+    const zoomTo = (target) => {
+      cancelAnimationFrame(anim)
+      const from = view.slice()
+      if (reduced) return setView(target)
+      const t0 = performance.now()
+      const step = (now) => {
+        const p = Math.min(1, (now - t0) / 700)
+        const e = 1 - Math.pow(1 - p, 4)
+        setView(from.map((v, i) => v + (target[i] - v) * e))
+        if (p < 1) anim = requestAnimationFrame(step)
+      }
+      anim = requestAnimationFrame(step)
+    }
+    const mobile = window.matchMedia(MOBILE)
+    let chips = null
+    const selectRegion = (key) => {
+      const r = REGIONS.find((x) => x.key === key) || REGIONS[0]
+      svg.classList.toggle('is-world', !r.box)
+      if (chips)
+        chips.querySelectorAll('.map_region').forEach((b) => {
+          const on = b.dataset.region === r.key
+          b.classList.toggle('is-active', on)
+          b.setAttribute('aria-pressed', String(on))
+        })
+      zoomTo(r.box || full)
+    }
+    const setMode = () => {
+      if (mobile.matches && !chips) {
+        chips = document.createElement('div')
+        chips.className = 'map_regions'
+        chips.setAttribute('role', 'group')
+        chips.setAttribute('aria-label', 'Zoom to region')
+        REGIONS.forEach((r) => {
+          const b = document.createElement('button')
+          b.type = 'button'
+          b.className = 'map_region'
+          b.dataset.region = r.key
+          b.textContent = r.label
+          b.addEventListener('click', () => selectRegion(r.key))
+          chips.appendChild(b)
+        })
+        holder.before(chips)
+        selectRegion(REGIONS[0].key)
+      } else if (!mobile.matches && chips) {
+        chips.remove()
+        chips = null
+        svg.classList.remove('is-world')
+        cancelAnimationFrame(anim)
+        setView(full)
+      }
+    }
+    setMode()
+    mobile.addEventListener('change', setMode)
+
     let metric = 'a'
     const metricLabel = (m) => {
       const t = toggles.find((x) => x.dataset.mapMetric === m)
@@ -190,6 +261,12 @@ export default async function (elements) {
       g.addEventListener('mouseleave', hide)
       g.addEventListener('focus', show)
       g.addEventListener('blur', hide)
+    })
+    svg.addEventListener('click', (e) => {
+      if (!e.target.closest('.map_city') && tip) {
+        tip.classList.remove('is-visible')
+        cities.forEach(({ g }) => g.classList.remove('is-on'))
+      }
     })
   })
 }

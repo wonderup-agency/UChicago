@@ -88,6 +88,66 @@
   opacity: 1;
 }
 
+/* Mobile region chips (built by JS below 768px) */
+.map_regions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.75rem 1.25rem 0.5rem;
+  scrollbar-width: none;
+}
+
+.map_regions::-webkit-scrollbar {
+  display: none;
+}
+
+.map_region {
+  flex-shrink: 0;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--_color---neutral--border);
+  border-radius: 100px;
+  background-color: var(--_color---neutral--white);
+  color: var(--_color---neutral--black);
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color 250ms ease,
+    border-color 250ms ease,
+    color 250ms ease;
+}
+
+.map_region.is-active {
+  border-color: var(--_color---neutral--black);
+  background-color: var(--_color---neutral--black);
+  color: var(--_color---neutral--white);
+}
+
+.map_region:focus-visible {
+  outline: 2px solid var(--_color---secondary--bright-blue);
+  outline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .map_svg {
+    overflow: hidden;
+  }
+
+  /* Bigger, tappable dots and readable labels once zoomed in */
+  .map_city-name,
+  .map_city-value {
+    font-size: 15px;
+  }
+
+  .map_svg.is-world .map_city-name,
+  .map_svg.is-world .map_city-value {
+    display: none;
+  }
+}
+
 @keyframes map-pulse {
   0% {
     opacity: 0.7;
@@ -102,6 +162,7 @@
 @media (prefers-reduced-motion: reduce) {
   .map_city-dot,
   .map_country,
+  .map_region,
   [data-map-tip] {
     transition: none;
   }

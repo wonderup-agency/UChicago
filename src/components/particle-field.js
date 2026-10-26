@@ -372,11 +372,13 @@ function buildStates(D) {
 
 // DOM anchors in document order. Consecutive research graphics (one per tab
 // pane) collapse into one key that always points at the visible pane.
-function collectKeys() {
+// On mobile the dust field is skipped (cleaner, lighter): dust anchors go dark.
+function collectKeys(mobile) {
   const keys = []
   document.querySelectorAll('[data-particles-state]').forEach((el) => {
     let type = el.dataset.particlesState
     if (type === 'flow') type = 'band'
+    if (mobile && type === 'dust') type = 'off'
     if (!(type in KIND)) return
     const last = keys[keys.length - 1]
     if (type === 'research' && last && last.type === 'research') {
@@ -386,7 +388,13 @@ function collectKeys() {
     keys.push({ type, els: [el], dir: +(el.dataset.dir || 1) })
   })
   keys.forEach((k) => {
-    k.el = () => k.els.find((e) => e.offsetParent !== null) || k.els[0]
+    const visible = () => k.els.find((e) => e.offsetParent !== null)
+    k.el = () => visible() || k.els[0]
+    // Research accordion fully closed: fade the region out over the section.
+    k.fallback = () =>
+      !visible() && k.type === 'research'
+        ? k.els[0].closest('[data-component="research-tabs"]')
+        : null
   })
   return keys
 }
@@ -489,18 +497,38 @@ export default async function (elements) {
   scene.add(points)
 
   // ── timeline anchored to the DOM ─────────────────────────────────
-  const keys = collectKeys()
+  const keys = collectKeys(isMobile())
   if (!keys.length) return
   const anchor = (k) => {
+    const fb = k.fallback && k.fallback()
+    if (fb) {
+      const f = fb.getBoundingClientRect()
+      // Near-zero scale shrinks every dot below the visible size: the region fades out.
+      return [f.left + f.width / 2, f.top + f.height / 2, 0.02, 0]
+    }
     const r = k.el().getBoundingClientRect()
     const vw = window.innerWidth
     const vh = window.innerHeight
     switch (k.type) {
       case 'hero': {
-        const s = isMobile()
-          ? Math.min(r.width / 860, r.height / 1100)
-          : r.width / 1440
-        return [r.left + r.width / 2, r.top + r.height / 2 - r.top * 0.28, s, 0]
+        if (isMobile()) {
+          // Mobile: the shape lives in the stage below the CTAs, never behind text.
+          const stage =
+            parseFloat(window.getComputedStyle(k.el()).paddingBottom) || 320
+          const s = Math.min(r.width / 1000, stage / 760)
+          return [
+            r.left + r.width / 2,
+            r.bottom - stage / 2 - r.top * 0.15,
+            s,
+            0,
+          ]
+        }
+        return [
+          r.left + r.width / 2,
+          r.top + r.height / 2 - r.top * 0.28,
+          r.width / 1440,
+          0,
+        ]
       }
       case 'band':
         return [vw / 2, r.top + r.height / 2, vw / 1440, k.dir]

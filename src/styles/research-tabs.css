@@ -1,5 +1,6 @@
-/* research-tabs: pane entrance and tab hover nudge.
-   Visibility (.research_pane / .cc-active) and the active tab look live in Webflow. */
+/* research-tabs: pane entrance, tab hover nudge and the mobile accordion.
+   Visibility (.research_pane / .cc-active) and the active tab look live in Webflow.
+   .is-accordion is added by JS below 768px, when each pane sits under its tab. */
 .research_pane.cc-active {
   animation: research-pane-in 450ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -13,10 +14,65 @@
   transform: translate(2px, -2px);
 }
 
+@media (max-width: 767px) {
+  .is-accordion .research_panes {
+    display: none;
+  }
+
+  .is-accordion .research_tab {
+    min-height: 3.5rem;
+    opacity: 0.55;
+  }
+
+  .is-accordion .research_tab.cc-active {
+    opacity: 1;
+    border-bottom-color: transparent;
+  }
+
+  /* Closed: arrow points down. Open: points up. */
+  .is-accordion .research_tab .research_tab-icon,
+  .is-accordion .research_tab:hover .research_tab-icon {
+    transform: rotate(135deg);
+  }
+
+  .is-accordion .research_tab.cc-active .research_tab-icon {
+    transform: rotate(-45deg);
+  }
+
+  .is-accordion .research_pane.cc-active {
+    padding-top: 0.25rem;
+    padding-bottom: 2rem;
+    row-gap: 1.75rem;
+    border-bottom: 1px solid var(--_color---neutral--border);
+    animation-name: research-accordion-in;
+  }
+
+  .is-accordion .research_side {
+    row-gap: 1.5rem;
+  }
+
+  /* The graphic is where particle-field draws the region; keep it compact. */
+  .is-accordion .research_graphic {
+    width: 6.5rem;
+    height: 6.5rem;
+  }
+}
+
 @keyframes research-pane-in {
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes research-accordion-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
