@@ -5,6 +5,11 @@
 // counts the stats up and tells particle-field to morph the dotted graphic
 // (window event "research:change" with { index }).
 //
+// Tabs change on click (not hover) and autoplay every AUTOPLAY_MS on desktop.
+// The progress line under the active tab is a CSS animation; its animationend
+// is the clock, so pausing (hover, focus, offscreen, hidden tab) is just
+// animation-play-state. A click restarts the countdown on the chosen tab.
+//
 // Below 768px it becomes an accordion: each pane is moved right under its
 // tab (no duplicated content, so Webflow props keep working), one item open
 // at a time, tapping the open item closes it. Panes move back on resize.
@@ -13,10 +18,11 @@ import { countUp, reducedMotion } from '../utils/motion.js'
 import '../styles/research-tabs.css'
 
 const MOBILE = '(max-width: 767px)'
+const AUTOPLAY_MS = 6000
 
 export default function (elements) {
-  const canHover = window.matchMedia('(hover: hover) and (pointer: fine)')
   const mobile = window.matchMedia(MOBILE)
+  const autoplay = !reducedMotion()
 
   elements.forEach((root, rootIndex) => {
     const tabList = root.querySelector('.research_tabs')
@@ -125,9 +131,6 @@ export default function (elements) {
         e.preventDefault()
         select(i)
       })
-      tab.addEventListener('mouseenter', () => {
-        if (canHover.matches && !accordion) select(i)
-      })
       tab.addEventListener('keydown', (e) => {
         const map = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }
         if (e.key in map) {
@@ -153,6 +156,34 @@ export default function (elements) {
 
     setMode()
     mobile.addEventListener('change', setMode)
+
+    // ── Autoplay (tabs mode only) ────────────────────────────────────
+    if (autoplay) {
+      root.style.setProperty('--research-autoplay', `${AUTOPLAY_MS}ms`)
+      const pauses = new Set()
+      const setPaused = (reason, on) => {
+        if (on) pauses.add(reason)
+        else pauses.delete(reason)
+        root.classList.toggle('is-paused', pauses.size > 0)
+      }
+      const syncPlaying = () => root.classList.toggle('is-autoplay', !accordion)
+      syncPlaying()
+      mobile.addEventListener('change', syncPlaying)
+
+      tabList.addEventListener('animationend', (e) => {
+        if (e.animationName !== 'research-progress' || accordion) return
+        select((current + 1) % tabs.length)
+      })
+      root.addEventListener('mouseenter', () => setPaused('hover', true))
+      root.addEventListener('mouseleave', () => setPaused('hover', false))
+      root.addEventListener('focusin', () => setPaused('focus', true))
+      root.addEventListener('focusout', (e) => {
+        if (!root.contains(e.relatedTarget)) setPaused('focus', false)
+      })
+      new IntersectionObserver(([entry]) =>
+        setPaused('offscreen', !entry.isIntersecting)
+      ).observe(root)
+    }
 
     // First reveal: count the visible pane up once it enters the viewport.
     if (reducedMotion()) return

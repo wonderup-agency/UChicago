@@ -13,17 +13,17 @@
 
 .nav .container.cc-nav {
   transition:
-    max-width 450ms cubic-bezier(0.22, 1, 0.36, 1),
-    width 450ms cubic-bezier(0.22, 1, 0.36, 1),
-    margin-top 450ms cubic-bezier(0.22, 1, 0.36, 1),
-    padding 450ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 450ms ease,
-    background-color 450ms ease;
+    max-width 750ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 750ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 750ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 750ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 750ms ease,
+    background-color 750ms ease;
 }
 
 .nav .nav-wordmark_title,
 .nav .nav-wordmark_sub {
-  transition: font-size 450ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: font-size 750ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .nav.is-scrolled .container.cc-nav {
@@ -58,7 +58,7 @@
   .nav .nav-link {
     transition:
       color 300ms cubic-bezier(0.165, 0.84, 0.44, 1),
-      padding 450ms cubic-bezier(0.22, 1, 0.36, 1);
+      padding 750ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .nav.is-scrolled .nav-link {
