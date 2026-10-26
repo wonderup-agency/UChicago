@@ -14,6 +14,10 @@
 
 export default [
   {
+    selector: "[data-component='nav-scroll']",
+    importFn: () => import('./components/nav-scroll.js'),
+  },
+  {
     selector: "[data-component='particle-field']",
     importFn: () => import('./components/particle-field.js'),
   },

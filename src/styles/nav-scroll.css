@@ -1,0 +1,87 @@
+/* nav-scroll: sticky compact pill + hello bar that scrolls away.
+   .nav is position: fixed in Webflow; --nav-shift and .is-scrolled come from JS. */
+.nav {
+  pointer-events: none;
+  transform: translate3d(0, var(--nav-shift, 0px), 0);
+}
+
+/* Only the visible parts take clicks, so the transparent strip beside the
+   pill never blocks the page underneath. */
+.nav > * {
+  pointer-events: auto;
+}
+
+.nav .container.cc-nav {
+  transition:
+    max-width 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    width 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin-top 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 450ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 450ms ease,
+    background-color 450ms ease;
+}
+
+.nav .nav-wordmark_title,
+.nav .nav-wordmark_sub {
+  transition: font-size 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav.is-scrolled .container.cc-nav {
+  max-width: min(72rem, calc(100% - 8rem));
+  margin-top: 0.625rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  background-color: color-mix(
+    in srgb,
+    var(--_color---neutral--white) 92%,
+    transparent
+  );
+  box-shadow: 0 10px 30px rgba(29, 36, 52, 0.08);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.nav.is-scrolled .nav-wordmark_title {
+  font-size: 0.875rem;
+}
+
+.nav.is-scrolled .nav-wordmark_sub {
+  font-size: 0.6875rem;
+}
+
+/* Menu open: solid backdrop behind the pill so page content never peeks through */
+.nav:has(.nav-menu_btn.w--open) {
+  background-color: var(--_color---neutral--white);
+}
+
+@media (min-width: 992px) {
+  .nav .nav-link {
+    transition:
+      color 300ms cubic-bezier(0.165, 0.84, 0.44, 1),
+      padding 450ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .nav.is-scrolled .nav-link {
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
+  }
+}
+
+@media (max-width: 991px) {
+  .nav.is-scrolled .container.cc-nav {
+    max-width: none;
+    width: calc(100% - 1.5rem);
+    margin-top: 0.5rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav .container.cc-nav,
+  .nav .nav-wordmark_title,
+  .nav .nav-wordmark_sub,
+  .nav .nav-link {
+    transition: none;
+  }
+}
