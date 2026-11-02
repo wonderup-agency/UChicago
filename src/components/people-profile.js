@@ -12,6 +12,9 @@
 import { reducedMotion } from '../utils/motion.js'
 import '../styles/people-profile.css'
 
+// DEBUG people-profile: remove before deploy
+console.log('[people-profile] module loaded')
+
 const PARAM = 'person'
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -60,7 +63,17 @@ function readPeople() {
 export default function (elements) {
   const root = elements[0]
   const people = readPeople()
-  if (!root || !people.length) return
+  // DEBUG people-profile: remove before deploy
+  console.log('[people-profile] init', {
+    root: !!root,
+    cards: document.querySelectorAll('[data-person-card]').length,
+    people: people.length,
+    first: people[0],
+  })
+  if (!root || !people.length) {
+    console.warn('[people-profile] stopped: missing panel root or people')
+    return
+  }
 
   // The panel must sit above every stacking context on the page.
   document.body.appendChild(root)
@@ -173,6 +186,13 @@ export default function (elements) {
     const p = people[idx]
     const wasOpen = current !== -1
     current = idx
+    console.log(
+      '[people-profile] show',
+      idx,
+      p.slug,
+      p.projects.length,
+      'projects'
+    )
     fill(p)
 
     if (!wasOpen) {
@@ -217,6 +237,7 @@ export default function (elements) {
     p.card.href = urlFor(p.slug).toString()
     p.card.setAttribute('aria-haspopup', 'dialog')
     p.card.addEventListener('click', (e) => {
+      console.log('[people-profile] card click', p.slug)
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return
       e.preventDefault()
       show(i)
