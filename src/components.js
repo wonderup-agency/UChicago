@@ -14,6 +14,10 @@
 
 export default [
   {
+    selector: "[data-component='people-profile']",
+    importFn: () => import('./components/people-profile.js'),
+  },
+  {
     selector: "[data-component='nav-scroll']",
     importFn: () => import('./components/nav-scroll.js'),
   },

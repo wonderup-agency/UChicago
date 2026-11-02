@@ -1,14 +1,14 @@
 // --------------------------------------------------
 // particle-field
 // --------------------------------------------------
-// One fixed WebGL canvas behind the whole page. Particles morph between
-// states anchored to DOM elements with data-particles-state:
+// One fixed WebGL canvas behind the whole page, drawing independent layers.
+// Each shape is anchored to its DOM element (data-particles-state) and scrolls
+// with it, already formed: particles never travel between sections.
 //   hero      → looping shapes (ring → world → africa → south america → europe)
 //   flow      → river band (data-flow, data-dir="1|-1")
-//   research  → dotted region graphic (driven by research-tabs)
-//   dust      → faint field behind card sections
+//   research  → dotted region graphic (morphs between regions on tab change)
 //   team      → river bend inside the Team card
-//   off       → hidden
+//   dust/off  → ignored: the dust is one fixed background layer for the page
 // Reduced motion: static shapes, no loop. No WebGL / software GPU: no canvas.
 // --------------------------------------------------
 import {
@@ -41,10 +41,11 @@ const P = {
   color: '#7ea0f0',
   scrollDrag: 1,
   river: 16,
-  riverBoost: 2.5,
 }
-const KIND = { hero: 0, research: 1, band: 2, dust: 2, team: 2, off: 2 }
-const MOT = { hero: 1, research: 1, band: 0.9, dust: 1, team: 0.7, off: 1 }
+const KIND = { hero: 0, research: 1, band: 2, dust: 2, team: 2 }
+const MOT = { hero: 1, research: 1, band: 0.9, dust: 1, team: 0.7 }
+// Dust is a background layer: lighter on mobile.
+const DUST_OPACITY = { desktop: 1, mobile: 0.6 }
 const BAND_C = [
   -91.1, -88.9, -85.1, -80.2, -74.6, -68.2, -60.1, -50.3, -38.9, -26.4, -13.6,
   -0.9, 11.0, 21.8, 32.0, 41.6, 50.5, 58.2, 64.2, 68.0, 69.6, 68.9, 65.9, 60.7,
@@ -83,11 +84,11 @@ float snoise(vec3 v){
 }`
 
 const VERTEX = `
-attribute vec4 aHeroA, aHeroB, aResA, aResB, aSegA, aSegB, aRand;
-uniform float uTime, uDelay, uHeroBlend, uResBlend, uSeg, uFromKind, uToKind, uSwirl, uBreath, uDrift;
-uniform float uMouseR, uMouseF, uChaos, uPR, uPoint, uVel, uRiver, uRiverT;
+attribute vec4 aHeroA, aHeroB, aResA, aResB, aSeg, aRand;
+uniform float uTime, uDelay, uHeroBlend, uResBlend, uKind, uMot, uOpacity, uSwirl, uBreath, uDrift;
+uniform float uMouseR, uMouseF, uMouseK, uChaos, uPR, uPoint, uVel, uRiver, uRiverT;
 uniform float uBandC[37]; uniform float uBandW[37];
-uniform vec4 uFromAnc, uToAnc; uniform vec2 uMot, uHeroC, uRes, uMouse, uMouseSlow;
+uniform vec4 uAnc; uniform vec2 uHeroC, uRes, uMouse, uMouseSlow;
 varying float vAlpha, vSize;
 ${NOISE}
 float ease(float t){ return t*t*t*(t*(t*6.0-15.0)+10.0); }
@@ -151,17 +152,10 @@ void state(float kind, vec4 seg, vec4 anc, out vec2 px, out float r, out float o
   px = anc.xy + p*anc.z;
 }
 void main(){
-  vec2 fp, tp; float fr, tr, fo, to, fm, tm;
-  state(uFromKind, aSegA, uFromAnc, fp, fr, fo, fm);
-  state(uToKind, aSegB, uToAnc, tp, tr, to, tm);
-  float xn = clamp(fp.x/uRes.x, 0.0, 1.0);
-  float dl = mix(aRand.z, xn, 0.55)*0.45;
-  float ts = ease(clamp((uSeg - dl)/0.55, 0.0, 1.0));
-  vec2 d = tp - fp;
-  vec2 px = mix(fp, tp, ts) + vec2(-d.y,d.x)*sin(3.14159*ts)*(aRand.w-0.5)*0.22;
-  float r = mix(fr, tr, ts), o = mix(fo, to, ts);
-  float s = mix(uFromAnc.z, uToAnc.z, ts);
-  float amp = mix(fm*uMot.x, tm*uMot.y, ts) * s;
+  vec2 px; float r, o, m;
+  state(uKind, aSeg, uAnc, px, r, o, m);
+  float s = uAnc.z;
+  float amp = m*uMot*s;
   px += curl(vec3(px*0.0018, uTime*0.09)) * uBreath * (0.55+0.45*aRand.y) * amp;
   px += curl(vec3(px*0.006+17.0, uTime*0.16)) * uBreath * 0.35 * aRand.w * amp;
   float sp = 0.25 + aRand.x*0.6;
@@ -173,7 +167,7 @@ void main(){
   float rad = uMouseR * edge * mix(1.0, 0.75+aRand.y*0.5, uChaos);
   float q = dist/rad;
   float fall = exp(-q*q*2.5);
-  float str = uMouseF * mix(1.0, 0.6+0.8*aRand.x, uChaos);
+  float str = uMouseF * uMouseK * mix(1.0, 0.6+0.8*aRand.x, uChaos);
   px += (md + vec2(-md.y,md.x)*(aRand.w-0.5)*0.8*uChaos) * fall * str;
   vec2 clip = px/uRes*2.0 - 1.0; clip.y = -clip.y;
   gl_Position = vec4(clip, 0.0, 1.0);
@@ -181,7 +175,7 @@ void main(){
   float drawn = max(size, 1.3);
   gl_PointSize = drawn*uPR;
   vSize = drawn*uPR;
-  vAlpha = o * min(1.0, (size*size)/(1.69));
+  vAlpha = o * uOpacity * min(1.0, (size*size)/(1.69));
 }`
 
 const FRAGMENT = `
@@ -372,14 +366,13 @@ function buildStates(D) {
 
 // DOM anchors in document order. Consecutive research graphics (one per tab
 // pane) collapse into one key that always points at the visible pane.
-// On mobile the dust field is skipped (cleaner, lighter): dust anchors go dark.
-function collectKeys(mobile) {
+// Dust anchors are skipped: the dust is a single page-wide background layer.
+function collectKeys() {
   const keys = []
   document.querySelectorAll('[data-particles-state]').forEach((el) => {
     let type = el.dataset.particlesState
     if (type === 'flow') type = 'band'
-    if (mobile && type === 'dust') type = 'off'
-    if (!(type in KIND)) return
+    if (type === 'dust' || type === 'off' || !(type in KIND)) return
     const last = keys[keys.length - 1]
     if (type === 'research' && last && last.type === 'research') {
       last.els.push(el)
@@ -390,11 +383,8 @@ function collectKeys(mobile) {
   keys.forEach((k) => {
     const visible = () => k.els.find((e) => e.offsetParent !== null)
     k.el = () => visible() || k.els[0]
-    // Research accordion fully closed: fade the region out over the section.
-    k.fallback = () =>
-      !visible() && k.type === 'research'
-        ? k.els[0].closest('[data-component="research-tabs"]')
-        : null
+    // Research accordion fully closed: the region fades out.
+    k.hidden = () => k.type === 'research' && !visible()
   })
   return keys
 }
@@ -438,18 +428,13 @@ export default async function (elements) {
   const scene = new Scene()
   const camera = new Camera()
 
-  const U = {
+  // Uniforms shared by every layer (same objects, updated once per frame).
+  const shared = {
     uTime: { value: 0 },
     uDelay: { value: P.delay },
     uHeroBlend: { value: 1 },
     uHeroC: { value: new Vector2() },
     uResBlend: { value: 1 },
-    uSeg: { value: 0 },
-    uFromKind: { value: 0 },
-    uToKind: { value: 0 },
-    uFromAnc: { value: new Vector4(0, 0, 1, 0) },
-    uToAnc: { value: new Vector4(0, 0, 1, 0) },
-    uMot: { value: new Vector2(1, 1) },
     uSwirl: { value: P.swirl },
     uBreath: { value: P.breath },
     uDrift: { value: P.drift },
@@ -461,54 +446,75 @@ export default async function (elements) {
     uRes: { value: new Vector2(1, 1) },
     uPR: { value: 1 },
     uPoint: { value: 1 },
-    uVel: { value: 0 },
     uColor: { value: new Color(P.color) },
     uRiver: { value: P.river },
     uRiverT: { value: 0 },
     uBandC: { value: BAND_C },
     uBandW: { value: BAND_W },
   }
-  const material = new ShaderMaterial({
-    transparent: true,
-    depthTest: false,
-    depthWrite: false,
-    uniforms: U,
-    vertexShader: VERTEX,
-    fragmentShader: FRAGMENT,
-  })
+  const noVel = { value: 0 }
+  const pageVel = { value: 0 }
 
-  const geo = new BufferGeometry()
-  geo.setAttribute('position', new BufferAttribute(new Float32Array(N * 3), 3))
-  geo.setAttribute('aRand', new BufferAttribute(S.rand, 4))
   const attr = (b) => new BufferAttribute(b, 4)
   const heroAttr = S.heroBufs.map(attr)
   const resAttr = S.resBufs.map(attr)
   const segAttr = Object.fromEntries(
     Object.entries(S.seg).map(([k, b]) => [k, attr(b)])
   )
-  geo.setAttribute('aHeroA', heroAttr[0])
-  geo.setAttribute('aHeroB', heroAttr[0])
-  geo.setAttribute('aResA', resAttr[0])
-  geo.setAttribute('aResB', resAttr[0])
-  geo.setAttribute('aSegA', segAttr.dust)
-  geo.setAttribute('aSegB', segAttr.dust)
-  const points = new Points(geo, material)
-  points.frustumCulled = false
-  scene.add(points)
+  const position = new BufferAttribute(new Float32Array(N * 3), 3)
+  const randAttr = new BufferAttribute(S.rand, 4)
 
-  // ── timeline anchored to the DOM ─────────────────────────────────
-  const keys = collectKeys(isMobile())
-  if (!keys.length) return
-  const anchor = (k) => {
-    const fb = k.fallback && k.fallback()
-    if (fb) {
-      const f = fb.getBoundingClientRect()
-      // Near-zero scale shrinks every dot below the visible size: the region fades out.
-      return [f.left + f.width / 2, f.top + f.height / 2, 0.02, 0]
+  // One Points object per shape. All layers share the attribute buffers;
+  // only the hero and research layers swap their A/B pairs when they morph.
+  const makeLayer = (type, seg) => {
+    const geo = new BufferGeometry()
+    geo.setAttribute('position', position)
+    geo.setAttribute('aRand', randAttr)
+    geo.setAttribute('aHeroA', heroAttr[0])
+    geo.setAttribute('aHeroB', heroAttr[0])
+    geo.setAttribute('aResA', resAttr[0])
+    geo.setAttribute('aResB', resAttr[0])
+    geo.setAttribute('aSeg', segAttr[seg] || segAttr.off)
+    const uniforms = {
+      ...shared,
+      uKind: { value: KIND[type] },
+      uMot: { value: MOT[type] },
+      uAnc: { value: new Vector4(0, 0, 1, 0) },
+      uOpacity: { value: 0 },
+      // The research region is a data graphic: the cursor never bends it.
+      uMouseK: { value: type === 'research' ? 0 : 1 },
+      // Shapes stay locked to their element; only the dust feels scroll drag.
+      uVel: type === 'dust' ? pageVel : noVel,
     }
-    const r = k.el().getBoundingClientRect()
+    const material = new ShaderMaterial({
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      uniforms,
+      vertexShader: VERTEX,
+      fragmentShader: FRAGMENT,
+    })
+    const points = new Points(geo, material)
+    points.frustumCulled = false
+    points.visible = false
+    scene.add(points)
+    return { geo, uniforms, points, opacity: 0 }
+  }
+
+  const keys = collectKeys()
+  const dust = makeLayer('dust', 'dust')
+  keys.forEach((k) => {
+    const seg = k.type === 'band' ? 'band' : k.type === 'team' ? 'team' : 'off'
+    k.layer = makeLayer(k.type, seg)
+  })
+  const heroLayers = keys.filter((k) => k.type === 'hero').map((k) => k.layer)
+  const resLayers = keys
+    .filter((k) => k.type === 'research')
+    .map((k) => k.layer)
+
+  // ── anchors: each shape follows its element's box ────────────────
+  const anchor = (k, r) => {
     const vw = window.innerWidth
-    const vh = window.innerHeight
     switch (k.type) {
       case 'hero': {
         if (isMobile()) {
@@ -537,43 +543,13 @@ export default async function (elements) {
       case 'team':
         return [r.left + r.width / 2, r.top + r.height / 2, r.width / 1360, 2]
       default:
-        return [vw / 2, vh / 2, Math.max(vw / 1440, vh / 900), 0]
+        return [vw / 2, window.innerHeight / 2, 1, 0]
     }
   }
-  const focusY = (k) => {
-    if (k.type === 'hero') return 0
-    const r = k.el().getBoundingClientRect()
-    return window.scrollY + r.top + r.height / 2 - window.innerHeight / 2
-  }
+  // Is the element (plus the halo its particles drift into) on screen?
+  const onScreen = (r, pad) =>
+    r.bottom > -pad && r.top < window.innerHeight + pad && r.height > 0
   const smoother = (t) => t * t * t * (t * (t * 6 - 15) + 10)
-  const scrollIndex = () => {
-    const f = keys.map(focusY)
-    const y = window.scrollY
-    if (y <= f[0]) return 0
-    for (let i = 0; i < f.length - 1; i++) {
-      if (y < f[i + 1]) {
-        const raw = (y - f[i]) / Math.max(1, f[i + 1] - f[i])
-        const h = 0.22
-        return i + smoother(Math.min(1, Math.max(0, (raw - h) / (1 - 2 * h))))
-      }
-    }
-    return f.length - 1
-  }
-  const spring = { value: 0, velocity: 0 }
-  const springTo = (s, target, dt, time) => {
-    const w = 5 / time
-    const a = Math.exp(-w * dt)
-    const o = s.value - target
-    const v = (s.velocity + w * o) * dt
-    s.value = target + (o + v) * a
-    s.velocity = (s.velocity - w * v) * a
-  }
-  let boundA = -1
-  let boundB = -1
-  const bindSeg = (i, slot) => {
-    const t = keys[i].type
-    if (KIND[t] === 2) geo.setAttribute(slot, segAttr[t])
-  }
 
   // ── hero loop + research morph ───────────────────────────────────
   const loop = { from: 0, to: 0, blend: 1, phase: 'hold', t: 0 }
@@ -583,8 +559,10 @@ export default async function (elements) {
     loop.blend = 0
     loop.phase = 'morph'
     loop.t = 0
-    geo.setAttribute('aHeroA', heroAttr[loop.from])
-    geo.setAttribute('aHeroB', heroAttr[loop.to])
+    heroLayers.forEach((l) => {
+      l.geo.setAttribute('aHeroA', heroAttr[loop.from])
+      l.geo.setAttribute('aHeroB', heroAttr[loop.to])
+    })
   }
   const resLoop = { from: 0, to: 0, blend: 1 }
   const resGo = (i) => {
@@ -592,8 +570,10 @@ export default async function (elements) {
     resLoop.from = resLoop.to
     resLoop.to = i
     resLoop.blend = 0
-    geo.setAttribute('aResA', resAttr[resLoop.from])
-    geo.setAttribute('aResB', resAttr[resLoop.to])
+    resLayers.forEach((l) => {
+      l.geo.setAttribute('aResA', resAttr[resLoop.from])
+      l.geo.setAttribute('aResB', resAttr[resLoop.to])
+    })
   }
   window.addEventListener('research:change', (e) => resGo(e.detail.index))
 
@@ -616,16 +596,33 @@ export default async function (elements) {
 
   const resize = () => {
     renderer.setSize(window.innerWidth, window.innerHeight, false)
-    U.uRes.value.set(window.innerWidth, window.innerHeight)
-    U.uPR.value = renderer.getPixelRatio()
+    shared.uRes.value.set(window.innerWidth, window.innerHeight)
+    shared.uPR.value = renderer.getPixelRatio()
   }
   window.addEventListener('resize', resize)
   resize()
 
+  // Dust fades in once; shapes switch on instantly, already formed, while
+  // they are still outside the viewport (the halo padding), so they are never
+  // seen assembling.
+  const fade = (layer, target, dt) => {
+    layer.opacity = reduced
+      ? target
+      : layer.opacity + (target - layer.opacity) * (1 - Math.exp(-dt * 6))
+    if (Math.abs(layer.opacity - target) < 0.002) layer.opacity = target
+    layer.uniforms.uOpacity.value = layer.opacity
+    layer.points.visible = layer.opacity > 0.002
+  }
+  const toggle = (layer, on) => {
+    layer.opacity = on ? 1 : 0
+    layer.uniforms.uOpacity.value = layer.opacity
+    layer.points.visible = on
+  }
+
   // ── frame ────────────────────────────────────────────────────────
   let lastY = window.scrollY
   let vel = 0
-  const river = { t: 0, boost: 1 }
+  const river = { t: 0 }
   let last = performance.now()
   let time = 0
   const frame = (now) => {
@@ -633,31 +630,26 @@ export default async function (elements) {
     last = now
     if (!reduced) time += dt
 
-    springTo(spring, scrollIndex(), dt, reduced ? 0.01 : 0.45)
-    const idx = Math.max(0, Math.min(keys.length - 1, spring.value))
-    let a = Math.floor(idx)
-    let b = Math.min(keys.length - 1, a + 1)
-    let seg = idx - a
-    if (a === keys.length - 1) {
-      b = a
-      seg = 0
-    }
-    if (a !== boundA) {
-      bindSeg(a, 'aSegA')
-      boundA = a
-    }
-    if (b !== boundB) {
-      bindSeg(b, 'aSegB')
-      boundB = b
-    }
-    const ka = keys[a]
-    const kb = keys[b]
-    U.uFromKind.value = KIND[ka.type]
-    U.uToKind.value = KIND[kb.type]
-    U.uFromAnc.value.set(...anchor(ka))
-    U.uToAnc.value.set(...anchor(kb))
-    U.uMot.value.set(MOT[ka.type], MOT[kb.type])
-    U.uSeg.value = seg
+    // Background dust: fixed to the viewport, always there.
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    dust.uniforms.uAnc.value.set(
+      vw / 2,
+      vh / 2,
+      Math.max(vw / 1440, vh / 900),
+      0
+    )
+    fade(dust, isMobile() ? DUST_OPACITY.mobile : DUST_OPACITY.desktop, dt)
+
+    let heroVisible = false
+    keys.forEach((k) => {
+      const r = k.el().getBoundingClientRect()
+      const pad = k.type === 'hero' ? vh * 0.3 : k.type === 'band' ? 320 : 200
+      const show = !k.hidden() && onScreen(r, pad)
+      if (show) k.layer.uniforms.uAnc.value.set(...anchor(k, r))
+      if (k.type === 'hero' && show) heroVisible = true
+      toggle(k.layer, show)
+    })
 
     if (loop.phase === 'morph') {
       loop.t += dt
@@ -666,29 +658,33 @@ export default async function (elements) {
         loop.phase = 'hold'
         loop.t = 0
       }
-    } else if (!reduced && idx < 0.04) {
+    } else if (!reduced && heroVisible) {
       loop.t += dt
       if (loop.t >= P.hold) heroGo((loop.to + 1) % HERO_KEYS.length)
     }
-    U.uHeroBlend.value = loop.blend
+    shared.uHeroBlend.value = loop.blend
     const ca = S.heroCenters[loop.from]
     const cb = S.heroCenters[loop.to]
     const e = smoother(loop.blend)
-    U.uHeroC.value.set(ca[0] + (cb[0] - ca[0]) * e, ca[1] + (cb[1] - ca[1]) * e)
+    shared.uHeroC.value.set(
+      ca[0] + (cb[0] - ca[0]) * e,
+      ca[1] + (cb[1] - ca[1]) * e
+    )
     if (resLoop.blend < 1)
       resLoop.blend = reduced ? 1 : Math.min(1, resLoop.blend + dt / 1.4)
-    U.uResBlend.value = resLoop.blend
+    shared.uResBlend.value = resLoop.blend
 
-    const v = (window.scrollY - lastY) / Math.max(dt, 1e-3)
+    // Clamp: a nav jump is not a scroll gesture.
+    const v = Math.max(
+      -3000,
+      Math.min(3000, (window.scrollY - lastY) / Math.max(dt, 1e-3))
+    )
     lastY = window.scrollY
     vel += (v - vel) * (1 - Math.exp(-dt * 6))
-    U.uVel.value = reduced ? 0 : vel * P.scrollDrag
-    const target = 1 + Math.min(Math.abs(vel) / 450, 1) * P.riverBoost
-    river.boost +=
-      (target - river.boost) *
-      (1 - Math.exp(-dt * (target > river.boost ? 2.5 : 0.8)))
-    if (!reduced) river.t += dt * river.boost
-    U.uRiverT.value = river.t
+    pageVel.value = reduced ? 0 : vel * P.scrollDrag
+    // Rivers loop at a constant speed: they never rush on scroll.
+    if (!reduced) river.t += dt
+    shared.uRiverT.value = river.t
 
     const k = 1 - Math.exp(-dt * 3.2)
     const ks = 1 - Math.exp(-dt * 0.9)
@@ -697,11 +693,11 @@ export default async function (elements) {
     mouse.sx += (mouse.tx - mouse.sx) * ks
     mouse.sy += (mouse.ty - mouse.sy) * ks
     mouse.s += (mouse.ts - mouse.s) * (1 - Math.exp(-dt * 1.4))
-    U.uMouse.value.set(mouse.x, mouse.y)
-    U.uMouseSlow.value.set(mouse.sx, mouse.sy)
-    U.uMouseF.value = reduced ? 0 : P.mouseForce * mouse.s
+    shared.uMouse.value.set(mouse.x, mouse.y)
+    shared.uMouseSlow.value.set(mouse.sx, mouse.sy)
+    shared.uMouseF.value = reduced ? 0 : P.mouseForce * mouse.s
 
-    U.uTime.value = time
+    shared.uTime.value = time
     renderer.render(scene, camera)
   }
 
