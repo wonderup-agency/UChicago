@@ -52,6 +52,8 @@ const TREND_COLORS = [
   '#c9473f',
 ]
 const TABS = ['scope', 'methodology', 'trend', 'definitions']
+// Default globe view (Figma 38300): North America left, Europe right
+const GLOBE_HOME = [55, -38]
 const ICONS = {
   map: '<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Zm0 0v14m6-12v14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
   globe:
@@ -382,7 +384,7 @@ export default async function (elements) {
   const grat = geoGraticule10()
   const sphere = { type: 'Sphere' }
 
-  let geom = { alpha: 1, rotate: [80, -30], scale: 1, translate: [0, 0] }
+  let geom = { alpha: 1, rotate: GLOBE_HOME, scale: 1, translate: [0, 0] }
   let size = { w: 0, h: 0 }
   const isSmall = () => size.w < 768
 
@@ -394,13 +396,15 @@ export default async function (elements) {
         ? [-ent.lng, -clamp(ent.lat, -40, 55) * 0.7]
         : geom.alpha > 0.5
           ? geom.rotate
-          : [80, -30]
-      const r = isSmall() ? Math.min(w, h) * 0.46 : h * 0.62
+          : GLOBE_HOME
+      // Desktop: large globe whose top sits just under the header and whose
+      // lower half is covered by the panel (Figma 38300)
+      const r = isSmall() ? Math.min(w, h) * 0.46 : Math.min(h * 0.8, w * 0.34)
       return {
         alpha: 1,
         rotate,
         scale: r,
-        translate: [w / 2, isSmall() ? h / 2 : h * 0.66],
+        translate: [w / 2, isSmall() ? h / 2 : h * 0.07 + r],
       }
     }
     const p = geoNaturalEarth1().rotate([-10, 0])
@@ -429,19 +433,24 @@ export default async function (elements) {
       .clipAngle(
         g.alpha <= 0.001 ? null : g.alpha >= 0.999 ? 90 : 180 - g.alpha * 90
       )
+    // Sphere and graticule only read well once the shape is nearly round,
+    // so they fade in over the last part of the morph.
+    const globeness = clamp((g.alpha - 0.7) / 0.3, 0, 1)
     sphereFill.setAttribute('d', path(sphere) || '')
-    sphereFill.style.opacity = g.alpha
+    sphereFill.style.opacity = globeness
     sphereLine.setAttribute('d', path(sphere) || '')
-    sphereLine.style.opacity = g.alpha
+    sphereLine.style.opacity = globeness
     gratPath.setAttribute('d', path(grat) || '')
-    gratPath.style.opacity = g.alpha
+    gratPath.style.opacity = globeness
     landPaths.forEach(({ f, p }) => p.setAttribute('d', path(f) || ''))
     positionBeacons()
   }
   let anim = 0
   let moving = false
-  function animateTo(g, dur = 900) {
+  let animToken = 0
+  function animateTo(g, dur = 900, then) {
     cancelAnimationFrame(anim)
+    const token = ++animToken
     const from = {
       ...geom,
       rotate: [...geom.rotate],
@@ -452,6 +461,7 @@ export default async function (elements) {
     dr = ((((dr + 180) % 360) + 360) % 360) - 180
     if (reduced || !dur) {
       apply(g)
+      if (then) return then()
       placeLabels()
       return
     }
@@ -471,6 +481,7 @@ export default async function (elements) {
         ],
       })
       if (t < 1) anim = requestAnimationFrame(step)
+      else if (then && token === animToken) then()
       else {
         moving = false
         placeLabels()
@@ -662,9 +673,12 @@ export default async function (elements) {
     })
     layer('labels').innerHTML = html
   }
+  // The profile always shows someone: the selected entity or the leader
+  const profileId = () => state.entity || current.rows[0]?.ent.id
   function paintSelection() {
+    const sel = profileId()
     beacons.forEach(({ b, r }) => {
-      b.classList.toggle('is-selected', r.ent.id === state.entity)
+      b.classList.toggle('is-selected', r.ent.id === sel)
       b.classList.toggle('is-hot', r.ent.id === state.hot)
     })
   }
@@ -696,9 +710,32 @@ export default async function (elements) {
       b.setAttribute('aria-pressed', String(b.dataset.atlasView === v))
     )
     svg.classList.toggle('is-globe', v === 'globe')
-    animate
-      ? animateTo(targetGeom(v), 1100)
-      : (apply(targetGeom(v)), placeLabels())
+    const target = targetGeom(v)
+    if (!animate) {
+      apply(target)
+      placeLabels()
+    } else if (v === 'globe' && geom.alpha < 0.999) {
+      // 1) morph flat → globe facing the same longitude, equator centered
+      //    (no rotation while the shape changes, so nothing folds over)
+      // 2) then spin the globe to its target view
+      const lng = geom.rotate[0]
+      animateTo(
+        {
+          alpha: 1,
+          rotate: [lng, 0],
+          scale: target.scale,
+          translate: target.translate,
+        },
+        800,
+        () => animateTo(target, 900)
+      )
+    } else if (v === 'flat' && geom.alpha > 0.001) {
+      // 1) spin the globe back to the flat map's center
+      // 2) then unfold it into the flat map
+      animateTo({ ...geom, alpha: 1, rotate: target.rotate }, 700, () =>
+        animateTo(target, 800)
+      )
+    } else animateTo(target, 900)
     writeUrl()
   }
   viewBtns.forEach((b) =>

@@ -32,10 +32,9 @@
   stroke: var(--_color---neutral--border);
   stroke-width: 1.5;
 }
+/* Figma shows a clean globe: the graticule is kept in the SVG but hidden */
 .atlas_grat {
-  fill: none;
-  stroke: var(--_color---neutral--border);
-  stroke-width: 0.6;
+  display: none;
 }
 .atlas_country {
   fill: #eef1f6;
@@ -66,9 +65,14 @@
   opacity: 0;
   transition: opacity 200ms ease;
 }
-.atlas_beacon.is-hot .atlas_beacon-halo,
-.atlas_beacon.is-selected .atlas_beacon-halo {
+.atlas_beacon.is-hot .atlas_beacon-halo {
   opacity: 0.25;
+}
+/* Selected beacon: white ring with a soft shadow (Figma 38300) */
+.atlas_beacon.is-selected .atlas_beacon-halo {
+  fill: var(--_color---neutral--white);
+  opacity: 1;
+  filter: drop-shadow(0 2px 6px rgba(30, 60, 140, 0.25));
 }
 .atlas_beacon:focus-visible .atlas_beacon-halo {
   opacity: 1;
