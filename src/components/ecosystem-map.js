@@ -56,18 +56,21 @@ function placeLabel(g, c, r) {
     el.setAttribute('y', y)
     el.style.textAnchor = anchor
   }
+  // Figma (Feedback 3): only the city name next to the dot; the value lives
+  // in the tooltip and the aria-label. The value node stays in the DOM (it is
+  // hidden in CSS) so the metric animation keeps working.
   if (side === 'a') {
-    set(n, c.x, c.y - r - gap - 16, 'middle')
+    set(n, c.x, c.y - r - gap, 'middle')
     set(v, c.x, c.y - r - gap, 'middle')
   } else if (side === 'b') {
     set(n, c.x, c.y + r + gap + 12, 'middle')
-    set(v, c.x, c.y + r + gap + 28, 'middle')
+    set(v, c.x, c.y + r + gap + 12, 'middle')
   } else if (side === 'l') {
-    set(n, c.x - r - gap, c.y - 2, 'end')
-    set(v, c.x - r - gap, c.y + 14, 'end')
+    set(n, c.x - r - gap, c.y + 4, 'end')
+    set(v, c.x - r - gap, c.y + 4, 'end')
   } else {
-    set(n, c.x + r + gap, c.y - 2, 'start')
-    set(v, c.x + r + gap, c.y + 14, 'start')
+    set(n, c.x + r + gap, c.y + 4, 'start')
+    set(v, c.x + r + gap, c.y + 4, 'start')
   }
 }
 

@@ -75,6 +75,8 @@
 }
 
 .map_city-value {
+  /* Figma (Feedback 3): names only on the map; values in the tooltip */
+  display: none;
   fill: var(--city-color);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
