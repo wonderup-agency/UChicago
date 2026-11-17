@@ -167,18 +167,22 @@
 .atlas_panel.is-collapsed .atlas_body {
   display: none;
 }
+/* Filters sit above the results so open dropdowns are never covered */
+.atlas_filters {
+  position: relative;
+  z-index: 3;
+}
 .atlas_panel:not(.is-collapsed) .atlas_field,
 .atlas_panel:not(.is-collapsed) .atlas_body {
-  animation: atlas-fade-in 350ms ease both;
+  animation: atlas-fade-in 350ms ease backwards;
 }
 @keyframes atlas-fade-in {
   from {
     opacity: 0;
   }
 }
-.atlas_sphere,
-.atlas_sphere-fill {
-  transition: opacity 300ms ease;
+.atlas_ghost {
+  pointer-events: none;
 }
 
 /* View toggle + filter toggle states */

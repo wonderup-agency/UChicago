@@ -71,6 +71,8 @@
   display: none;
 }
 .atlas_dd-option {
+  margin: 0;
+  font-weight: 400;
   padding: 0.5625rem 0.875rem;
   border-radius: 0.625rem;
   color: var(--_color---neutral--black);

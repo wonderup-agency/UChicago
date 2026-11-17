@@ -424,8 +424,8 @@ export default async function (elements) {
   const svg = document.createElementNS(SVG_NS, 'svg')
   svg.setAttribute('class', 'atlas_svg')
   svg.innerHTML =
-    '<g data-layer="base"><path class="atlas_sphere-fill"/><path class="atlas_grat"/></g>' +
-    '<path class="atlas_land"/><g data-layer="land"></g><path class="atlas_borders"/><path class="atlas_sphere"/>' +
+    '<g data-layer="map"><g data-layer="base"><path class="atlas_sphere-fill"/><path class="atlas_grat"/></g>' +
+    '<path class="atlas_land"/><g data-layer="land"></g><path class="atlas_borders"/><path class="atlas_sphere"/></g>' +
     '<g data-layer="beacons"></g><g data-layer="labels" aria-hidden="true"></g>'
   stage.appendChild(svg)
   const tip = document.createElement('div')
@@ -777,6 +777,14 @@ export default async function (elements) {
 
   // ── View toggle ──────────────────────────────────────────────────
   const viewBtns = [...root.querySelectorAll('[data-atlas-view]')]
+  // Flat ↔ globe: a crossfade instead of a projection morph. The current
+  // map is frozen into a "ghost" copy that shrinks (or grows) and fades out
+  // while the new view fades and settles in; the globe also spins the last
+  // few degrees into place and beacons glide from old to new positions.
+  // No intermediate projections, so nothing folds, clips or leaves lines.
+  const smooth = (t) => 1 - Math.pow(1 - t, 4) // easeOutQuart
+  const easeIO = (t) =>
+    t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2
   function setView(v, animate = true) {
     state.view = v
     viewBtns.forEach((b) =>
@@ -784,32 +792,87 @@ export default async function (elements) {
     )
     svg.classList.toggle('is-globe', v === 'globe')
     const target = targetGeom(v)
-    if (!animate) {
+    writeUrl()
+    cancelAnimationFrame(anim)
+    animToken++
+    svg.querySelectorAll('.atlas_ghost').forEach((g) => g.remove())
+    const mapG = layer('map')
+    mapG.removeAttribute('transform')
+    mapG.style.opacity = ''
+    if (!animate || reduced) {
       apply(target)
       placeLabels()
-    } else if (v === 'globe' && geom.alpha < 0.999) {
-      // 1) morph flat → globe facing the same longitude, equator centered
-      //    (no rotation while the shape changes, so nothing folds over)
-      // 2) then spin the globe to its target view
-      const lng = geom.rotate[0]
-      animateTo(
-        {
-          alpha: 1,
-          rotate: [lng, 0],
-          scale: target.scale,
-          translate: target.translate,
-        },
-        800,
-        () => animateTo(target, 900)
+      return
+    }
+    const toGlobe = v === 'globe'
+    const ghost = mapG.cloneNode(true)
+    ghost.removeAttribute('data-layer')
+    ghost.setAttribute('class', 'atlas_ghost')
+    ghost.setAttribute('aria-hidden', 'true')
+    svg.insertBefore(ghost, mapG)
+    const fromXY = new Map(beacons.map((x) => [x.r.ent.id, x.xy]))
+    // Zoom around the globe's center (where the flat map "wraps" into)
+    const globe = toGlobe ? target : geom
+    const [ox, oy] = globe.translate
+    const zoom = (k) =>
+      `translate(${ox} ${oy}) scale(${k}) translate(${-ox} ${-oy})`
+    const spin = toGlobe ? 28 : 0
+    const dur = 1100
+    moving = true
+    clearLabels()
+    const t0 = performance.now()
+    const step = (now) => {
+      const t = Math.min(1, (now - t0) / dur)
+      const e = smooth(t)
+      apply(
+        toGlobe
+          ? {
+              ...target,
+              rotate: [target.rotate[0] + spin * (1 - e), target.rotate[1]],
+            }
+          : target
       )
-    } else if (v === 'flat' && geom.alpha > 0.001) {
-      // 1) spin the globe back to the flat map's center
-      // 2) then unfold it into the flat map
-      animateTo({ ...geom, alpha: 1, rotate: target.rotate }, 700, () =>
-        animateTo(target, 800)
+      // old view: out fast; new view: in a beat later
+      const out = easeIO(Math.min(1, t / 0.55))
+      const inn = smooth(clamp((t - 0.12) / 0.88, 0, 1))
+      ghost.style.opacity = String(1 - out)
+      ghost.setAttribute(
+        'transform',
+        zoom(toGlobe ? 1 - 0.18 * out : 1 + 0.12 * out)
       )
-    } else animateTo(target, 900)
-    writeUrl()
+      mapG.style.opacity = String(inn)
+      mapG.setAttribute(
+        'transform',
+        zoom(toGlobe ? 1.06 - 0.06 * inn : 0.94 + 0.06 * inn)
+      )
+      beacons.forEach((x) => {
+        const a = fromXY.get(x.r.ent.id)
+        const b = x.xy
+        if (a && b) {
+          x.b.style.display = ''
+          x.b.style.opacity = ''
+          x.b.setAttribute(
+            'transform',
+            `translate(${lerp(a[0], b[0], e).toFixed(1)},${lerp(a[1], b[1], e).toFixed(1)})`
+          )
+        } else if (a && !b) {
+          x.b.style.display = t < 0.5 ? '' : 'none'
+          x.b.style.opacity = String(1 - out)
+          x.b.setAttribute('transform', `translate(${a[0]},${a[1]})`)
+        } else if (b) x.b.style.opacity = String(inn)
+      })
+      if (t < 1) anim = requestAnimationFrame(step)
+      else {
+        ghost.remove()
+        mapG.removeAttribute('transform')
+        mapG.style.opacity = ''
+        beacons.forEach((x) => (x.b.style.opacity = ''))
+        apply(target)
+        moving = false
+        placeLabels()
+      }
+    }
+    anim = requestAnimationFrame(step)
   }
   viewBtns.forEach((b) =>
     b.addEventListener('click', () => setView(b.dataset.atlasView))
@@ -989,7 +1052,8 @@ export default async function (elements) {
     ? [...drawer.querySelectorAll('[data-drawer-panel]')]
     : []
   let activeTab = 'scope'
-  function showTab(tab) {
+  function showTab(tab, animate = true) {
+    const prevTab = activeTab
     activeTab = TABS.includes(tab) ? tab : 'scope'
     tabBtns.forEach((b) => {
       const on = b.dataset.drawerTab === activeTab
@@ -1000,24 +1064,121 @@ export default async function (elements) {
     if (activeTab === 'trend') renderTrend()
     const panel = drawer.querySelector('.atlas-drawer_panel')
     if (panel) panel.scrollTop = 0
+    // Tab change: content slides in from the side it comes from
+    const shown = panels.find((p) => !p.hidden)
+    if (animate && !reduced && shown && prevTab !== activeTab) {
+      const dir = TABS.indexOf(activeTab) > TABS.indexOf(prevTab) ? 1 : -1
+      shown.animate(
+        [
+          { transform: `translateX(${dir * 24}px)`, opacity: 0 },
+          { transform: 'none', opacity: 1 },
+        ],
+        { duration: 420, easing: EASE_OUT }
+      )
+    }
+  }
+  // Drawer motion: overlay fades, the panel slides in from the right (from
+  // the bottom on mobile) with a soft overshoot-free ease, the rail buttons
+  // pop in staggered and the content rises a beat later. Closing reverses
+  // it faster. Reduced motion: instant.
+  const EASE_OUT = 'cubic-bezier(0.16, 1, 0.3, 1)'
+  const EASE_IN = 'cubic-bezier(0.7, 0, 0.84, 0)'
+  let drawerAnims = []
+  const isMobile = () => window.matchMedia('(max-width: 767px)').matches
+  function drawerParts() {
+    return {
+      overlay: drawer.querySelector('.person-modal_overlay'),
+      panel: drawer.querySelector('.atlas-drawer_panel'),
+      btns: [...drawer.querySelectorAll('.person-modal_btn')],
+      content: drawer.querySelector('[data-drawer-panel]:not([hidden])'),
+      tabs: drawer.querySelector('.atlas-drawer_tabs'),
+    }
+  }
+  function runDrawer(open) {
+    drawerAnims.forEach((a) => a.cancel())
+    drawerAnims = []
+    if (reduced) return Promise.resolve()
+    const { overlay, panel, btns, content, tabs } = drawerParts()
+    const off = isMobile() ? 'translateY(48px)' : 'translateX(64px)'
+    const d = open ? 1 : -1
+    const opts = (duration, delay = 0) => ({
+      duration,
+      delay: open ? delay : 0,
+      easing: open ? EASE_OUT : EASE_IN,
+      fill: 'both',
+      direction: d > 0 ? 'normal' : 'reverse',
+    })
+    if (overlay)
+      drawerAnims.push(
+        overlay.animate(
+          [{ opacity: 0 }, { opacity: 0.6 }],
+          opts(open ? 450 : 280)
+        )
+      )
+    if (panel)
+      drawerAnims.push(
+        panel.animate(
+          [
+            { transform: off, opacity: 0 },
+            { transform: 'none', opacity: 1 },
+          ],
+          opts(open ? 650 : 300)
+        )
+      )
+    btns.forEach((b, i) =>
+      drawerAnims.push(
+        b.animate(
+          [
+            { transform: 'scale(0.6)', opacity: 0 },
+            { transform: 'none', opacity: 1 },
+          ],
+          opts(open ? 450 : 220, 120 + i * 60)
+        )
+      )
+    )
+    ;[tabs, content].filter(Boolean).forEach((el, i) =>
+      drawerAnims.push(
+        el.animate(
+          [
+            { transform: 'translateY(12px)', opacity: 0 },
+            { transform: 'none', opacity: 1 },
+          ],
+          opts(open ? 550 : 200, 140 + i * 70)
+        )
+      )
+    )
+    return Promise.all(drawerAnims.map((a) => a.finished)).catch(() => {})
   }
   function openDrawer(tab) {
     if (!drawer) return
     lastFocus = document.activeElement
-    showTab(tab)
+    showTab(tab, false)
     drawer.setAttribute('aria-hidden', 'false')
     drawer.classList.add('is-open')
     document.documentElement.classList.add('is-atlas-drawer-open')
+    runDrawer(true).then(() => {
+      if (drawer.classList.contains('is-open'))
+        drawerAnims.forEach((a) => a.cancel())
+    })
     requestAnimationFrame(() =>
-      drawer.querySelector(`[data-drawer-tab="${activeTab}"]`)?.focus()
+      drawer
+        .querySelector(`[data-drawer-tab="${activeTab}"]`)
+        ?.focus({ preventScroll: true })
     )
   }
+  let closing = false
   function closeDrawer() {
-    if (!drawer || !drawer.classList.contains('is-open')) return
-    drawer.classList.remove('is-open')
+    if (!drawer || !drawer.classList.contains('is-open') || closing) return
+    closing = true
     drawer.setAttribute('aria-hidden', 'true')
-    document.documentElement.classList.remove('is-atlas-drawer-open')
-    lastFocus?.focus?.()
+    runDrawer(false).then(() => {
+      drawer.classList.remove('is-open')
+      drawerAnims.forEach((a) => a.cancel())
+      drawerAnims = []
+      closing = false
+      document.documentElement.classList.remove('is-atlas-drawer-open')
+      lastFocus?.focus?.({ preventScroll: true })
+    })
   }
   if (drawer) {
     document.body.appendChild(drawer)
