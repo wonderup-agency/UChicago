@@ -1,0 +1,377 @@
+/* ecosystem-atlas: everything the JS draws (SVG map, ranking rows, pillar bars,
+   tooltip, trend chart) plus states Webflow classes can't express.
+   Layout, sizes and colors of the static structure live on the Webflow
+   classes (atlas_*, measure_*, atlas-drawer_*, atlas-def*). */
+
+[data-component='ecosystem-atlas'] [hidden],
+[data-atlas-drawer] [hidden],
+[data-atlas-measure] [hidden] {
+  display: none !important;
+}
+
+/* ── Map ─────────────────────────────────────────── */
+.atlas_svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.atlas_svg.is-globe {
+  cursor: grab;
+}
+.atlas_svg.is-dragging {
+  cursor: grabbing;
+}
+.atlas_sphere-fill {
+  fill: var(--_color---neutral--white);
+}
+.atlas_sphere {
+  fill: none;
+  stroke: var(--_color---neutral--border);
+  stroke-width: 1.5;
+}
+.atlas_grat {
+  fill: none;
+  stroke: var(--_color---neutral--border);
+  stroke-width: 0.6;
+}
+.atlas_country {
+  fill: #eef1f6;
+  stroke: var(--_color---neutral--white);
+  stroke-width: 0.6;
+  transition: fill 300ms ease;
+}
+.atlas_country.is-tracked {
+  fill: #d2e2f9;
+}
+
+.atlas_beacon {
+  cursor: pointer;
+  outline: none;
+}
+.atlas_beacon-dot {
+  fill: var(--beacon);
+  stroke: var(--_color---neutral--white);
+  stroke-width: 1.5;
+  transition: r 400ms ease;
+}
+.atlas_beacon.is-bubble .atlas_beacon-dot {
+  fill-opacity: 0.6;
+  stroke: var(--beacon);
+}
+.atlas_beacon-halo {
+  fill: var(--beacon);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.atlas_beacon.is-hot .atlas_beacon-halo,
+.atlas_beacon.is-selected .atlas_beacon-halo {
+  opacity: 0.25;
+}
+.atlas_beacon:focus-visible .atlas_beacon-halo {
+  opacity: 1;
+  fill: none;
+  stroke: var(--_color---primary--maroon);
+  stroke-width: 2;
+}
+
+.atlas_label-g text {
+  paint-order: stroke;
+  stroke: var(--_color---neutral--white);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  font-size: 14px;
+  pointer-events: none;
+}
+.atlas_label-name {
+  fill: var(--_color---neutral--black);
+}
+/* Values stay in text colors (the light beacon tones fail 4.5:1) */
+.atlas_label-value {
+  fill: var(--_color---neutral--mid-gray-2);
+  font-variant-numeric: tabular-nums;
+}
+.atlas_label-g.is-strong .atlas_label-value {
+  fill: var(--_color---secondary--deep-blue);
+}
+.atlas_label-g.is-hot .atlas_label-name {
+  font-weight: 500;
+}
+
+.atlas_tip {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--_color---neutral--border);
+  border-radius: 0.75rem;
+  background: var(--_color---neutral--white);
+  box-shadow: 0 10px 30px rgba(30, 60, 140, 0.12);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  transition: opacity 150ms ease;
+}
+.atlas_tip.is-visible {
+  opacity: 1;
+}
+.atlas_tip span {
+  color: var(--_color---neutral--mid-gray-2);
+}
+
+/* View toggle + filter toggle states */
+.atlas_view-btn[aria-pressed='true'] {
+  background-color: var(--_color---secondary--bright-blue-light);
+}
+.atlas_view-btn:focus-visible,
+.atlas_filter-btn:focus-visible,
+.atlas_row:focus-visible,
+.atlas-drawer_tab:focus-visible,
+.atlas-def_show:focus-visible,
+.atlas-def_more:focus-visible {
+  outline: 2px solid var(--_color---primary--maroon);
+  outline-offset: 2px;
+}
+.atlas_filter-btn[aria-expanded='false'] {
+  background-color: var(--_color---neutral--white);
+  box-shadow: inset 0 0 0 1px var(--_color---neutral--border);
+}
+
+/* Native selects: custom chevron */
+.atlas_select,
+.atlas_profile-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%231d2434' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+}
+.atlas_profile-select {
+  background-position: right 0 center;
+}
+.atlas_select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ── Ranking rows ────────────────────────────────── */
+.atlas_ranking {
+  scrollbar-width: thin;
+}
+.atlas_row {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(6rem, 9rem) 1fr 3.5rem 1rem;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6875rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--_color---neutral--border);
+  background: none;
+  color: var(--_color---neutral--black);
+  font: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  cursor: pointer;
+}
+.atlas_row-item.is-hot .atlas_row,
+.atlas_row[aria-pressed='true'] {
+  background: var(--_color---neutral--light-gray);
+}
+.atlas_row[aria-pressed='true'] .atlas_row-name {
+  font-weight: 500;
+}
+.atlas_row-index {
+  color: var(--_color---neutral--mid-gray-2);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.atlas_row-bar,
+.atlas_pillar-bar {
+  position: relative;
+  height: 0.375rem;
+  border-radius: 100px;
+  background: var(--_color---secondary--bright-blue-light);
+  overflow: hidden;
+}
+.atlas_row-bar span,
+.atlas_pillar-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 100px;
+  transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.atlas_row-value {
+  color: var(--_color---neutral--mid-gray-2);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ── Profile pillars ─────────────────────────────── */
+.atlas_stat-value small {
+  font-size: 0.75rem;
+  color: var(--_color---neutral--mid-gray-2);
+}
+.atlas_pillar {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr 4.5rem;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9375rem;
+}
+.atlas_pillar-bar span {
+  background: var(--_color---map--beacon-regular);
+}
+.atlas_pillar-value {
+  color: var(--_color---neutral--mid-gray-2);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ── Drawer ──────────────────────────────────────── */
+.atlas-drawer.is-open {
+  display: block;
+}
+html.is-atlas-drawer-open {
+  overflow: hidden;
+}
+.atlas-drawer_section > .eyebrow-component {
+  margin-bottom: -0.75rem;
+}
+.atlas-drawer_tab[aria-selected='true'] {
+  background-color: var(--_color---secondary--bright-blue-light);
+  color: var(--_color---neutral--black);
+}
+.atlas-drawer .person-modal_divider {
+  width: 100%;
+}
+.atlas-def {
+  scroll-margin-top: 1.5rem;
+}
+.atlas-def_show:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.atlas-def_more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--_color---primary--maroon-dark);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.atlas-def_more[aria-expanded='true'] svg {
+  transform: rotate(-90deg);
+}
+.atlas-def_more svg {
+  transition: transform 250ms ease;
+}
+
+/* Trend figure */
+.atlas-trend_legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--_color---neutral--mid-gray-2);
+}
+.atlas-trend_key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.atlas-trend_key i {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+}
+.atlas-trend_key i.is-muted {
+  background: #d4d9e3;
+}
+.atlas-trend_svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.atlas-trend_tick line {
+  stroke: var(--_color---neutral--border);
+}
+.atlas-trend_tick text,
+.atlas-trend_year {
+  fill: var(--_color---neutral--mid-gray-2);
+  font-size: 11px;
+}
+.atlas-trend_line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.atlas-trend_line.is-muted {
+  stroke: #d4d9e3;
+  stroke-width: 1.2;
+}
+.atlas-trend_end {
+  fill: var(--_color---neutral--mid-gray-2);
+  font-size: 11px;
+}
+.atlas-trend_table {
+  margin-top: 1.5rem;
+  overflow-x: auto;
+}
+.atlas-trend_table table {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.atlas-trend_table th,
+.atlas-trend_table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--_color---neutral--border);
+  text-align: right;
+}
+.atlas-trend_table thead th {
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .atlas_row {
+    grid-template-columns: 1.5rem minmax(5rem, 1fr) 4rem 3rem 1rem;
+    gap: 0.5rem;
+  }
+  .atlas_pillar {
+    grid-template-columns: 1fr 5rem 4rem;
+    gap: 0.75rem;
+  }
+  .atlas-drawer .person-modal_inner {
+    padding: 0;
+  }
+  .atlas-drawer_panel {
+    height: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas_beacon-dot,
+  .atlas_country,
+  .atlas_row-bar span,
+  .atlas_pillar-bar span {
+    transition: none;
+  }
+}

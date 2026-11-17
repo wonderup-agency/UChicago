@@ -14,6 +14,10 @@
 
 export default [
   {
+    selector: "[data-component='ecosystem-atlas']",
+    importFn: () => import('./components/ecosystem-atlas.js'),
+  },
+  {
     selector: "[data-component='people-profile']",
     importFn: () => import('./components/people-profile.js'),
   },

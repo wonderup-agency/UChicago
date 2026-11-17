@@ -7,6 +7,7 @@
 │   ├── config.js                  Shared project config (API keys, endpoints, flags)
 │   ├── components/
 │   │   └── global.js              Runs on every page before components load (imports global styles)
+│   ├── data/                      JSON fetched at runtime (emitted to dist/data/): ecosystem-map, particles, atlas (mock), atlas-world (110m TopoJSON)
 │   ├── styles/
 │   │   └── buttons.css            Button hover micro-interactions (Figma Button States)
 │   └── pages/
@@ -31,7 +32,8 @@
 ├── scripts/
 │   ├── setup.js                   One-time project initialisation (repo name, CDN URLs)
 │   ├── create-component.js        Scaffolds component + registers in components.js
-│   └── create-page.js             Scaffolds page bundle in src/pages/
+│   ├── create-page.js             Scaffolds page bundle in src/pages/
+│   └── atlas-mock.js              Generates the fictional src/data/atlas.json for the Ecosystem Atlas
 │
 ├── .claude/
 │   ├── CLAUDE.md                  Project instructions for Claude

@@ -105,6 +105,12 @@ The snippet uses the same dev/prod switcher pattern as the main site-wide snippe
 
 **Error cases**: Exits with code 1 if there is no `origin` remote or if the remote URL is not a recognisable GitHub URL.
 
+## atlas-mock (`scripts/atlas-mock.js`)
+
+**Usage**: `node scripts/atlas-mock.js`
+
+Writes `src/data/atlas.json` with FICTIONAL, seeded data for the Ecosystem Atlas (same seed = same file). Replace its output with the lab export keeping the same shape (see `components/ecosystem-atlas.md`).
+
 ## Shared behavior
 
 - Both scripts use `picocolors` for terminal output
