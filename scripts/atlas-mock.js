@@ -27,16 +27,106 @@ const blocks = [
 
 // key, name, block, unit, direction, level, [min, max], kind
 const MEASURES = [
-  ['vc-share-gdp', 'VC Investment as a Share of GDP', 'capital', '% of GDP', 'higher', 'country', [0.056, 1.6], 'rate'],
-  ['vc-deals', 'VC deals', 'capital', 'n', 'higher', 'city', [40, 4200], 'count'],
-  ['median-seed', 'Median seed round', 'capital', 'USD M', 'higher', 'city', [0.4, 6], 'rate'],
-  ['exit-value', 'Exit value', 'capital', 'USD B', 'higher', 'city', [0.2, 90], 'count'],
-  ['foreign-investor-share', 'Foreign investor share', 'capital', '%', 'higher', 'city', [4, 70], 'rate'],
-  ['hiring-demand', 'Startup hiring demand', 'talent', 'postings per 1k workers', 'higher', 'city', [2, 48], 'rate'],
-  ['specialist-density', 'Tech specialist density', 'talent', 'per 10k workers', 'higher', 'city', [20, 410], 'rate'],
-  ['talent-inflow', 'International talent inflow', 'talent', 'per 1k workers', 'higher', 'country', [0.4, 18], 'rate'],
-  ['talent-outflow', 'Talent outflow', 'talent', 'per 1k workers', 'lower', 'city', [0.6, 14], 'rate'],
-  ['repeat-founders', 'Repeat founders', 'talent', '%', 'higher', 'city', [6, 45], 'rate'],
+  [
+    'vc-share-gdp',
+    'VC Investment as a Share of GDP',
+    'capital',
+    '% of GDP',
+    'higher',
+    'country',
+    [0.056, 1.6],
+    'rate',
+  ],
+  [
+    'vc-deals',
+    'VC deals',
+    'capital',
+    'n',
+    'higher',
+    'city',
+    [40, 4200],
+    'count',
+  ],
+  [
+    'median-seed',
+    'Median seed round',
+    'capital',
+    'USD M',
+    'higher',
+    'city',
+    [0.4, 6],
+    'rate',
+  ],
+  [
+    'exit-value',
+    'Exit value',
+    'capital',
+    'USD B',
+    'higher',
+    'city',
+    [0.2, 90],
+    'count',
+  ],
+  [
+    'foreign-investor-share',
+    'Foreign investor share',
+    'capital',
+    '%',
+    'higher',
+    'city',
+    [4, 70],
+    'rate',
+  ],
+  [
+    'hiring-demand',
+    'Startup hiring demand',
+    'talent',
+    'postings per 1k workers',
+    'higher',
+    'city',
+    [2, 48],
+    'rate',
+  ],
+  [
+    'specialist-density',
+    'Tech specialist density',
+    'talent',
+    'per 10k workers',
+    'higher',
+    'city',
+    [20, 410],
+    'rate',
+  ],
+  [
+    'talent-inflow',
+    'International talent inflow',
+    'talent',
+    'per 1k workers',
+    'higher',
+    'country',
+    [0.4, 18],
+    'rate',
+  ],
+  [
+    'talent-outflow',
+    'Talent outflow',
+    'talent',
+    'per 1k workers',
+    'lower',
+    'city',
+    [0.6, 14],
+    'rate',
+  ],
+  [
+    'repeat-founders',
+    'Repeat founders',
+    'talent',
+    '%',
+    'higher',
+    'city',
+    [6, 45],
+    'rate',
+  ],
 ]
 
 const PILLARS = [
@@ -50,10 +140,37 @@ const PILLARS = [
 
 // id, name, country, iso (ISO 3166 numeric), region, lat, lng, strength 0-1
 const ECOS = [
-  ['sf-bay', 'San Francisco Bay', 'United States', '840', 'North America', 37.77, -122.42, 0.97],
-  ['new-york', 'New York', 'United States', '840', 'North America', 40.71, -74.0, 0.9],
+  [
+    'sf-bay',
+    'San Francisco Bay',
+    'United States',
+    '840',
+    'North America',
+    37.77,
+    -122.42,
+    0.97,
+  ],
+  [
+    'new-york',
+    'New York',
+    'United States',
+    '840',
+    'North America',
+    40.71,
+    -74.0,
+    0.9,
+  ],
   ['london', 'London', 'United Kingdom', '826', 'Europe', 51.5, -0.12, 0.86],
-  ['boston', 'Boston', 'United States', '840', 'North America', 42.36, -71.06, 0.84],
+  [
+    'boston',
+    'Boston',
+    'United States',
+    '840',
+    'North America',
+    42.36,
+    -71.06,
+    0.84,
+  ],
   ['tel-aviv', 'Tel Aviv', 'Israel', '376', 'Middle East', 32.08, 34.78, 0.83],
   ['shenzhen', 'Shenzhen', 'China', '156', 'Asia', 22.54, 114.06, 0.8],
   ['singapore', 'Singapore', 'Singapore', '702', 'Asia', 1.35, 103.82, 0.8],
@@ -63,7 +180,16 @@ const ECOS = [
   ['berlin', 'Berlin', 'Germany', '276', 'Europe', 52.52, 13.4, 0.72],
   ['bengaluru', 'Bengaluru', 'India', '356', 'Asia', 12.97, 77.59, 0.7],
   ['toronto', 'Toronto', 'Canada', '124', 'North America', 43.65, -79.38, 0.68],
-  ['sao-paulo', 'São Paulo', 'Brazil', '076', 'Latin America', -23.55, -46.63, 0.6],
+  [
+    'sao-paulo',
+    'São Paulo',
+    'Brazil',
+    '076',
+    'Latin America',
+    -23.55,
+    -46.63,
+    0.6,
+  ],
   ['jakarta', 'Jakarta', 'Indonesia', '360', 'Asia', -6.2, 106.85, 0.55],
   ['nairobi', 'Nairobi', 'Kenya', '404', 'Africa', -1.29, 36.82, 0.48],
 ]
@@ -97,7 +223,10 @@ MEASURES.forEach((m) => {
     const row = {}
     YEARS.forEach((y, i) => {
       const k = i / (YEARS.length - 1)
-      row[y] = toRaw(m, end - growth * (1 - k) + (rand() - 0.5) * 0.04 * (1 - k))
+      row[y] = toRaw(
+        m,
+        end - growth * (1 - k) + (rand() - 0.5) * 0.04 * (1 - k)
+      )
     })
     values[m[0]][e[0]] = row
   })
@@ -151,9 +280,24 @@ ECOS.forEach((e) => {
 
 // Country trend lines for the Trend figure tab (country-level series)
 const TREND_COUNTRIES = [
-  'United States', 'Israel', 'Singapore', 'United Kingdom', 'India', 'Sweden',
-  'Canada', 'France', 'China', 'United Arab Emirates', 'Germany', 'Australia',
-  'Brazil', 'Japan', 'South Korea', 'Indonesia', 'Kenya', 'Spain',
+  'United States',
+  'Israel',
+  'Singapore',
+  'United Kingdom',
+  'India',
+  'Sweden',
+  'Canada',
+  'France',
+  'China',
+  'United Arab Emirates',
+  'Germany',
+  'Australia',
+  'Brazil',
+  'Japan',
+  'South Korea',
+  'Indonesia',
+  'Kenya',
+  'Spain',
 ]
 const trend = {}
 MEASURES.forEach((m) => {
@@ -178,16 +322,18 @@ const data = {
     years: YEARS,
   },
   blocks,
-  measures: MEASURES.map(([key, name, block, unit, direction, level, range, kind]) => ({
-    key,
-    name,
-    block,
-    unit,
-    direction,
-    level,
-    range,
-    kind,
-  })),
+  measures: MEASURES.map(
+    ([key, name, block, unit, direction, level, range, kind]) => ({
+      key,
+      name,
+      block,
+      unit,
+      direction,
+      level,
+      range,
+      kind,
+    })
+  ),
   pillars: PILLARS,
   ecosystems,
   options,
