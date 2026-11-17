@@ -18,3 +18,42 @@
     transition: none;
   }
 }
+
+/* Hero readability: a soft white glow behind the hero copy so the particle
+   shapes never compete with the title, subtitle and buttons. It sits above
+   the fixed canvas (z 0) and below the text (isolated stacking context). */
+.hero_content {
+  position: relative;
+  isolation: isolate;
+}
+
+.hero_content::before {
+  content: '';
+  position: absolute;
+  /* Centered on the title and subtitle; the buttons have their own
+     solid background (below). */
+  inset: -24% -20% 0%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    var(--_color---neutral--white) 55%,
+    transparent 100%
+  );
+  opacity: 0.96;
+}
+
+/* Hero secondary button: solid white so the particles never show through
+   it. The hover keeps the soft maroon tint, mixed on white (still opaque). */
+.hero_btns .button[data-wf--button--button-variant='secondary'] {
+  background-color: var(--_color---neutral--white);
+}
+
+.hero_btns .button[data-wf--button--button-variant='secondary']:hover,
+.hero_btns .button[data-wf--button--button-variant='secondary']:focus-visible {
+  background-color: color-mix(
+    in srgb,
+    var(--_color---primary--maroon) 8%,
+    var(--_color---neutral--white)
+  );
+}

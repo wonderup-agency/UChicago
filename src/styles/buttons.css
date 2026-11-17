@@ -47,42 +47,32 @@
   transform: translate(3px, -3px);
 }
 
-/* Secondary (outline maroon): a maroon fill blooms from the bottom-left
-   corner, text and arrow turn white, and the arrow does its diagonal hop. */
+/* Secondary (outline maroon): the label rolls up and a copy rolls in from
+   below (text-shadow copy, no extra DOM), while a soft maroon tint fills the
+   pill. The button clips the label, so only one line is ever visible. */
 .button[data-wf--button--button-variant='secondary'] {
+  overflow: hidden;
   isolation: isolate;
-  transition:
-    color 450ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 450ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: background-color 450ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.button[data-wf--button--button-variant='secondary']::before {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  z-index: -1;
-  border-radius: inherit;
-  background-color: var(--_color---primary--maroon);
-  clip-path: circle(0% at 0% 100%);
-  transition: clip-path 550ms cubic-bezier(0.22, 1, 0.36, 1);
+.button[data-wf--button--button-variant='secondary'] .btn-text {
+  text-shadow: 0 2.4em currentColor;
+  transition: transform 550ms cubic-bezier(0.65, 0, 0.25, 1);
 }
 
 .button[data-wf--button--button-variant='secondary']:hover,
 .button[data-wf--button--button-variant='secondary']:focus-visible {
-  color: var(--_color---neutral--white);
-  background-color: transparent;
+  background-color: color-mix(
+    in srgb,
+    var(--_color---primary--maroon) 8%,
+    transparent
+  );
 }
 
-.button[data-wf--button--button-variant='secondary']:hover::before,
-.button[data-wf--button--button-variant='secondary']:focus-visible::before {
-  clip-path: circle(150% at 0% 100%);
-}
-
-.button[data-wf--button--button-variant='secondary']:hover .btn-icon svg,
-.button[data-wf--button--button-variant='secondary']:focus-visible
-  .btn-icon
-  svg {
-  animation-delay: 80ms;
+.button[data-wf--button--button-variant='secondary']:hover .btn-text,
+.button[data-wf--button--button-variant='secondary']:focus-visible .btn-text {
+  transform: translateY(-2.4em);
 }
 
 /* Secondary / small buttons: the arrow exits top-right and re-enters bottom-left */
@@ -108,8 +98,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .button[data-wf--button--button-variant='secondary'],
-  .button[data-wf--button--button-variant='secondary']::before {
+  .button[data-wf--button--button-variant='secondary'] .btn-text {
     transition: none;
+  }
+
+  .button[data-wf--button--button-variant='secondary']:hover .btn-text,
+  .button[data-wf--button--button-variant='secondary']:focus-visible .btn-text {
+    transform: none;
   }
 
   .btn-icon.cc-circle,
