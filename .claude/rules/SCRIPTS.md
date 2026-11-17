@@ -105,11 +105,11 @@ The snippet uses the same dev/prod switcher pattern as the main site-wide snippe
 
 **Error cases**: Exits with code 1 if there is no `origin` remote or if the remote URL is not a recognisable GitHub URL.
 
-## atlas-mock (`scripts/atlas-mock.js`)
+## atlas-build (`scripts/atlas-build.js`)
 
-**Usage**: `node scripts/atlas-mock.js`
+**Usage**: `npm run atlas:build` (or `node scripts/atlas-build.js [input]`)
 
-Writes `src/data/atlas.json` with FICTIONAL, seeded data for the Ecosystem Atlas (same seed = same file). Replace its output with the lab export keeping the same shape (see `components/ecosystem-atlas.md`).
+Reads the lab's `window.ATLAS` object from `prototype/ecosystem-platform/index.html` (default) or any HTML/JSON file holding it, and writes a compact `src/data/atlas.json` for the Ecosystem Atlas: entities and notes listed once and referenced by index, values rounded to 4 significant digits, World Bank names mapped to display names and to world-atlas polygons, and a map anchor for every country (largest polygon centroid via `d3-geo`, or a fixed point for countries missing from the 110m map). Prints the measure/entity count and how many countries have no map position. Shape: see `components/ecosystem-atlas.md`.
 
 ## Shared behavior
 

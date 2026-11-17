@@ -44,6 +44,6 @@
 
 ## Dependencies
 
-- **Runtime**: `picocolors` (used by scripts only, not bundled to browser), `three` (particle field), `d3-geo` + `topojson-client` (Ecosystem Atlas map projections, bundled only in the `ecosystem-atlas` chunk)
+- **Runtime**: `picocolors` (used by scripts only, not bundled to browser), `three` (particle field), `d3-geo` + `topojson-client` (Ecosystem Atlas map projections, bundled only in the `ecosystem-atlas` chunk; also used by `scripts/atlas-build.js`)
 - **Dev**: All other deps are devDependencies (Rollup, ESLint, Prettier, etc.)
 - No frontend framework — vanilla JavaScript only

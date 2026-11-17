@@ -7,7 +7,7 @@
 │   ├── config.js                  Shared project config (API keys, endpoints, flags)
 │   ├── components/
 │   │   └── global.js              Runs on every page before components load (imports global styles)
-│   ├── data/                      JSON fetched at runtime (emitted to dist/data/): ecosystem-map, particles, atlas (mock), atlas-world (110m TopoJSON)
+│   ├── data/                      JSON fetched at runtime (emitted to dist/data/): ecosystem-map, particles, atlas (lab data, built by atlas-build), atlas-world (110m TopoJSON)
 │   ├── styles/
 │   │   ├── buttons.css            Button hover micro-interactions (Figma Button States)
 │   │   └── dropdown.css           Custom dropdown popup (used by utils/dropdown.js)
@@ -28,7 +28,8 @@
 │       └── purge-cdn.yml          Purges jsDelivr CDN cache after every push to main that touches dist/
 │
 ├── prototype/
-│   └── particle-lab/              Reference prototype of the homepage particle field (not bundled, excluded from Prettier)
+│   ├── particle-lab/              Reference prototype of the homepage particle field (not bundled, excluded from Prettier)
+│   └── ecosystem-platform/        Lab's platform prototype (index.html holds window.ATLAS, the source for atlas.json)
 │
 ├── docs/
 │   └── migration-prompt.md        Two-phase Claude Code prompt for the Figma → Webflow migration
@@ -37,7 +38,7 @@
 │   ├── setup.js                   One-time project initialisation (repo name, CDN URLs)
 │   ├── create-component.js        Scaffolds component + registers in components.js
 │   ├── create-page.js             Scaffolds page bundle in src/pages/
-│   └── atlas-mock.js              Generates the fictional src/data/atlas.json for the Ecosystem Atlas
+│   └── atlas-build.js             Builds src/data/atlas.json from the lab's platform export
 │
 ├── .claude/
 │   ├── CLAUDE.md                  Project instructions for Claude

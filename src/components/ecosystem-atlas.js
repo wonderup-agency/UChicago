@@ -8,15 +8,19 @@
 //   [data-atlas-view="flat|globe"]      view toggle buttons
 //   [data-atlas-ranking]                <ol> filled with one row per entity
 //   [data-atlas-profile]                profile card ([data-atlas-entity] select,
-//                                       [data-atlas-meta|score|rank], [data-atlas-pillars])
+//                                       [data-atlas-meta|score|rank], [data-atlas-pillars]
+//                                       = last six years of the selected measure)
 //   [data-atlas-measure]                Measure Details band ([data-measure-field])
 //   [data-atlas-open="trend|definitions|scope|methodology"]  open the drawer
 //   [data-atlas-drawer]                 drawer (tabs [data-drawer-tab], panels
 //                                       [data-drawer-panel], [data-atlas-trend])
 //   [data-def="<key>"]                  one CMS Measures card per measure
-// Numbers come from dist/data/atlas.json (MOCK until the lab export arrives);
-// definitions and notes come from the Measures CMS cards.
-// Deep link: ?m=measure&e=entity&v=flat|globe&b=block&c=coverage&tab=drawer-tab
+// Numbers come from dist/data/atlas.json, built from the lab's platform
+// export by scripts/atlas-build.js (21 measures, countries + cities, series
+// per year with n). Definitions come from the Measures CMS cards (keyed by
+// measure code, e.g. F01) with the lab texts in the JSON as fallback.
+// Deep link: ?m=CODE&e=entity&v=flat|globe&b=block&c=core|all&l=city|country
+//            &i=industry-rank&f=variant&tab=drawer-tab
 // --------------------------------------------------
 import {
   geoPath,
@@ -76,7 +80,6 @@ const icon = (name, size = 20) =>
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 const lerp = (a, b, t) => a + (b - a) * t
-const mean = (xs) => xs.reduce((s, x) => s + x, 0) / (xs.length || 1)
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 const esc = (s) =>
   String(s).replace(
@@ -193,60 +196,66 @@ export default async function (elements) {
   const drawer = document.querySelector('[data-atlas-drawer]')
   const defs = readDefs()
   const select = (k) => root.querySelector(`[data-atlas-filter="${k}"]`)
-  const YEAR = DATA.meta.years[DATA.meta.years.length - 1]
-  const BASE_YEAR = DATA.meta.years[0]
 
   // ── Entities ─────────────────────────────────────────────────────
-  const ecos = DATA.ecosystems.map((e) => ({ ...e, kind: 'city' }))
-  const byCountry = new Map()
-  ecos.forEach((e) => {
-    if (!byCountry.has(e.iso)) byCountry.set(e.iso, [])
-    byCountry.get(e.iso).push(e)
-  })
-  const countries = [...byCountry.entries()].map(([iso, ms]) => ({
-    id: `c${iso}`,
-    name: ms[0].country,
-    country: ms[0].country,
-    region: ms[0].region,
-    iso,
-    lat: mean(ms.map((m) => m.lat)),
-    lng: mean(ms.map((m) => m.lng)),
-    kind: 'country',
-    members: ms,
+  // One list holds both countries and cities (city: 1); values reference
+  // them by index. Countries without a map position stay rankings-only.
+  const ENTS = DATA.entities.map((e) => ({
+    ...e,
+    kind: e.city ? 'city' : 'country',
   }))
   const measures = DATA.measures
   const measureBy = new Map(measures.map((m) => [m.key, m]))
+  const OPTIONS = {
+    coverage: [
+      ['core', 'Core ecosystems'],
+      ['all', 'All (every published country / top-100 cities)'],
+    ],
+    level: [
+      ['city', 'By city / metro'],
+      ['country', 'By country'],
+    ],
+    industry: [
+      ['0', '1st biggest'],
+      ['1', '2nd biggest'],
+      ['2', '3rd biggest'],
+    ],
+  }
+  const RANK_WORD = ['Leading', '2nd', '3rd']
 
   // ── State (+ deep link) ──────────────────────────────────────────
   const qs = new window.URLSearchParams(window.location.search)
   const opt = (k, v) =>
-    DATA.options[k].some(([id]) => id === v) ? v : DATA.options[k][0][0]
+    OPTIONS[k].some(([id]) => id === v) ? v : OPTIONS[k][0][0]
+  const wantM = (qs.get('m') || '').toUpperCase()
   const state = {
     block: DATA.blocks.some((b) => b.id === qs.get('b')) ? qs.get('b') : 'all',
-    measure: measureBy.has(qs.get('m')) ? qs.get('m') : measures[0].key,
+    measure: measureBy.has(wantM) ? wantM : measures[0].key,
     coverage: opt('coverage', qs.get('c')),
     industry: opt('industry', qs.get('i')),
-    flow: opt('flow', qs.get('f')),
+    flow: /^\d$/.test(qs.get('f') || '') ? qs.get('f') : '0',
     level: opt('level', qs.get('l')),
     entity: qs.get('e') || null,
     view: qs.get('v') === 'flat' ? 'flat' : 'globe',
     hot: null,
   }
   const measure = () => measureBy.get(state.measure)
-  // Country-only measures lock coverage to countries
-  const coverage = () =>
-    measure().level === 'country' ? 'countries' : state.coverage
-  const entities = () => (coverage() === 'countries' ? countries : ecos)
+  // Country-only measures lock the level selector to countries
+  const level = () => (measure().cityLevel ? state.level : 'country')
+  const variantIdx = () => {
+    const vs = measure().variants
+    return vs ? clamp(+state.flow || 0, 0, vs.length - 1) : 0
+  }
 
   function writeUrl() {
     const p = new window.URLSearchParams(window.location.search)
     const set = (k, v, def) => (v && v !== def ? p.set(k, v) : p.delete(k))
     set('m', state.measure, measures[0].key)
     set('b', state.block, 'all')
-    set('c', state.coverage, DATA.options.coverage[0][0])
-    set('i', state.industry, 'all')
-    set('f', state.flow, 'all')
-    set('l', state.level, 'all')
+    set('c', state.coverage, 'core')
+    set('i', state.industry, '0')
+    set('f', state.flow, '0')
+    set('l', state.level, 'city')
     set('e', state.entity, null)
     set('v', state.view, 'globe')
     const q = p.toString()
@@ -258,59 +267,81 @@ export default async function (elements) {
   }
 
   // ── Values ───────────────────────────────────────────────────────
-  const factor = (id) => {
-    const f = DATA.factors[id]
-    return f
-      ? f.industry[state.industry] * f.flow[state.flow] * f.level[state.level]
-      : 1
-  }
-  const round = (v, m) =>
-    m.unit === 'n' ? Math.round(v) : Math.round(v * 1000) / 1000
-  function valueOf(m, ent, year = YEAR) {
-    if (ent.kind === 'city') {
-      const raw = DATA.values[m.key]?.[ent.id]?.[year]
-      return raw == null ? null : round(raw * factor(ent.id), m)
-    }
-    const vs = ent.members
-      .map((e) => valueOf(m, e, year))
-      .filter((v) => v != null)
-    if (!vs.length) return null
-    return round(
-      m.kind === 'count' ? vs.reduce((s, v) => s + v, 0) : mean(vs),
-      m
-    )
-  }
+  // Each entity's value is its latest published year (years differ by
+  // entity). Industry rank re-points F15 at the 2nd/3rd industry; a variant
+  // re-points a measure published as a set of numbers (stock/new/exits...).
+  // Ranks follow the measure's direction; colors use the rank percentile in
+  // five steps so one outlier does not wash the rest of the map out.
   function table() {
-    const m = measure()
-    const rows = entities()
-      .map((ent) => ({
-        ent,
-        value: valueOf(m, ent),
-        start: valueOf(m, ent, BASE_YEAR),
+    const base = measure()
+    const lvl = level()
+    const vi = variantIdx()
+    const ir = base.industryRanks ? +state.industry : 0
+    const v = base.variants?.[vi]
+    const m = {
+      ...base,
+      unit: v?.unit || base.unit,
+      direction: v?.direction || base.direction,
+      variant: v?.label || '',
+    }
+    const rows = []
+    for (const [ei, core, ni, series] of DATA.values[base.key]) {
+      const ent = ENTS[ei]
+      if ((lvl === 'city') !== (ent.kind === 'city')) continue
+      if (state.coverage === 'core' && !core) continue
+      let pts = series.map(([year, value, n, x = {}]) => ({
+        year,
+        value,
+        n,
+        x,
+        top: x.inds?.[0]?.[0] || x.top || '',
       }))
-      .filter((r) => r.value != null)
+      if (ir > 0)
+        pts = pts
+          .filter((p) => p.x.inds?.[ir])
+          .map((p) => ({ ...p, value: p.x.inds[ir][1], top: p.x.inds[ir][0] }))
+      if (vi > 0)
+        pts = pts
+          .filter((p) => p.x.vals?.[vi] != null)
+          .map((p) => ({
+            ...p,
+            value: p.x.vals[vi],
+            n: p.x.cnts?.[vi] ?? p.n,
+          }))
+      pts = pts.filter((p) => Number.isFinite(p.value))
+      if (!pts.length) continue
+      const last = pts[pts.length - 1]
+      rows.push({
+        ent,
+        value: last.value,
+        year: last.year,
+        n: last.n,
+        top: last.top,
+        last,
+        series: pts,
+        note: DATA.notes[ni] || '',
+      })
+    }
     rows.sort((a, b) =>
       m.direction === 'lower' ? a.value - b.value : b.value - a.value
     )
-    const vals = rows.map((r) => r.value)
-    const lo = Math.min(...vals)
-    const hi = Math.max(...vals)
+    const count = rows.length
     rows.forEach((r, i) => {
       r.rank = i + 1
-      const t = hi === lo ? 1 : (r.value - lo) / (hi - lo)
-      r.t = m.direction === 'lower' ? 1 - t : t
+      r.t = count > 1 ? (count - 1 - i) / (count - 1) : 1
       r.bin = Math.min(4, Math.floor(r.t * 5))
     })
-    return { m, rows, lo, hi }
+    const vals = rows.map((r) => r.value)
+    return {
+      m,
+      rows,
+      lo: Math.min(...vals),
+      hi: Math.max(...vals),
+      level: lvl,
+      industryRank: ir,
+      many: count > 30,
+    }
   }
-  // Composite "vitality" score for the profile = mean of pillar scores
-  const pillarScores = (ent) =>
-    ent.kind === 'city'
-      ? DATA.pillarScores[ent.id]
-      : DATA.pillars.map((_, i) =>
-          Math.round(mean(ent.members.map((e) => DATA.pillarScores[e.id][i])))
-        )
-  const vitality = (ent) => Math.round(mean(pillarScores(ent)) * 10) / 10
 
   // ── Controls ─────────────────────────────────────────────────────
   // Native <select>s stay as the source of truth; enhanceSelect draws the
@@ -324,42 +355,82 @@ export default async function (elements) {
     el.value = value
     dropdowns.get(el)?.refresh()
   }
+  const lock = (el, locked, title) => {
+    if (!el) return
+    el.disabled = locked
+    el.title = title
+    dropdowns.get(el)?.refresh()
+  }
   function fillControls() {
     fill(
       select('block'),
-      [['all', 'All measures'], ...DATA.blocks.map((b) => [b.id, b.name])],
+      [
+        ['all', `All measures (${measures.length})`],
+        ...DATA.blocks.map((b) => [
+          b.id,
+          `${b.name} (${measures.filter((m) => m.block === b.id).length})`,
+        ]),
+      ],
       state.block
     )
-    const list = measures.filter(
-      (m) => state.block === 'all' || m.block === state.block
-    )
+    // Measures in lab order, grouped by theme inside the chosen block
+    const list = measures
+      .filter((m) => state.block === 'all' || m.block === state.block)
+      .sort(
+        (a, b) =>
+          (state.block === 'all' ? a.block.localeCompare(b.block) : 0) ||
+          a.themeRank - b.themeRank
+      )
     if (!list.some((m) => m.key === state.measure)) state.measure = list[0].key
     fill(
       select('measure'),
       list.map((m) => [m.key, m.name]),
       state.measure
     )
-    fill(select('coverage'), DATA.options.coverage, coverage())
-    const cov = select('coverage')
-    if (cov) {
-      const locked = measure().level === 'country'
-      cov.disabled = locked
-      cov.title = locked
-        ? 'This measure is available at country level only'
-        : ''
-      dropdowns.get(cov)?.refresh()
-    }
-    ;['industry', 'flow', 'level'].forEach((k) =>
-      fill(select(k), DATA.options[k], state[k])
+    const m = measure()
+    fill(select('coverage'), OPTIONS.coverage, state.coverage)
+    fill(select('level'), OPTIONS.level, level())
+    lock(
+      select('level'),
+      !m.cityLevel,
+      m.cityLevel
+        ? ''
+        : 'This measure is computed at country level only, so the city view is not available'
+    )
+    fill(
+      select('industry'),
+      OPTIONS.industry,
+      m.industryRanks ? state.industry : '0'
+    )
+    lock(
+      select('industry'),
+      !m.industryRanks,
+      m.industryRanks
+        ? 'Switch between the 1st, 2nd and 3rd biggest industry by deal count'
+        : 'Only the leading-industry measure ranks industries'
+    )
+    fill(
+      select('flow'),
+      m.variants
+        ? m.variants.map((v, i) => [String(i), v.label])
+        : [['0', 'Not applicable']],
+      String(variantIdx())
+    )
+    lock(
+      select('flow'),
+      !m.variants,
+      m.variants
+        ? `This measure is published as ${m.variants.length} numbers`
+        : 'Only measures published as a set of numbers have this'
     )
   }
   root.querySelectorAll('[data-atlas-filter]').forEach((el) =>
     el.addEventListener('change', () => {
       const k = el.dataset.atlasFilter
       state[k] = el.value
-      if (k === 'coverage' || k === 'measure' || k === 'block') {
-        const ids = new Set(entities().map((e) => e.id))
-        if (state.entity && !ids.has(state.entity)) state.entity = null
+      if (k === 'measure' || k === 'block') {
+        state.flow = '0'
+        state.industry = '0'
       }
       update()
     })
@@ -465,7 +536,6 @@ export default async function (elements) {
     { type: 'GeometryCollection', geometries: geoms },
     (a, b) => a !== b
   )
-  const trackedIso = new Set(ecos.map((e) => e.iso))
   const proj = blendProjection().precision(0.3)
   const path = geoPath(proj)
   const svg = document.createElementNS(SVG_NS, 'svg')
@@ -487,10 +557,7 @@ export default async function (elements) {
   const bordersPath = svg.querySelector('.atlas_borders')
   const landPaths = world.map((f) => {
     const p = document.createElementNS(SVG_NS, 'path')
-    p.setAttribute(
-      'class',
-      `atlas_country${trackedIso.has(String(f.id)) ? ' is-tracked' : ''}`
-    )
+    p.setAttribute('class', 'atlas_country')
     layer('land').appendChild(p)
     return { f, p }
   })
@@ -550,7 +617,8 @@ export default async function (elements) {
 
   function targetGeom(view) {
     const { w, h } = size
-    const ent = state.entity && entities().find((e) => e.id === state.entity)
+    const ent =
+      state.entity && current.rows.find((r) => r.ent.id === state.entity)?.ent
     if (view === 'globe') {
       const rotate = ent
         ? [-ent.lng, -clamp(ent.lat, -40, 55) * 0.7]
@@ -689,58 +757,66 @@ export default async function (elements) {
       clipAngle - 0.04
   function radius(r) {
     const k = isSmall() ? 0.75 : 1
-    if (current.m.kind === 'count') {
+    if (current.level === 'country') return 4 * k
+    if (current.m.kind === 'count' && !current.many) {
       const mx = Math.max(...current.rows.map((x) => x.value)) || 1
       return Math.max(4, Math.sqrt(Math.max(0, r.value) / mx) * 24) * k
     }
-    return (6 + r.t * 7) * k
+    return (current.many ? 3 + r.t * 4 : 6 + r.t * 7) * k
   }
+  // Units that start with % read as a suffix ("1.2% of GDP"); others follow
+  // the number after a space ("14 months")
   const unit = (m) =>
-    m.unit === 'n'
-      ? ''
-      : m.unit.startsWith('%') && m.unit.length === 1
-        ? '%'
-        : ` ${m.unit}`
+    !m.unit ? '' : m.unit.startsWith('%') ? m.unit : ` ${m.unit}`
   function renderBeacons() {
     const g = layer('beacons')
     g.innerHTML = ''
-    const countryMode = coverage() === 'countries'
-    beacons = current.rows.map((r) => {
-      const b = document.createElementNS(SVG_NS, 'g')
-      b.setAttribute('class', 'atlas_beacon')
-      b.setAttribute('tabindex', '0')
-      b.setAttribute('role', 'button')
-      b.setAttribute(
-        'aria-label',
-        `${r.ent.name}, ${fmt(r.value)}${unit(current.m)}, rank ${r.rank} of ${current.rows.length}`
-      )
-      b.dataset.id = r.ent.id
-      const rad = countryMode ? 4 : radius(r)
-      b.innerHTML = `<circle class="atlas_beacon-halo" r="${rad + 7}"/><circle class="atlas_beacon-dot" r="${rad}"/>`
-      b.style.setProperty('--beacon', BIN_VARS[r.bin])
-      if (current.m.kind === 'count' && !countryMode)
-        b.classList.add('is-bubble')
-      b.addEventListener('mouseenter', () => setHot(r.ent.id))
-      b.addEventListener('mouseleave', () => setHot(null))
-      b.addEventListener('focus', () => setHot(r.ent.id))
-      b.addEventListener('blur', () => setHot(null))
-      b.addEventListener('click', () => selectEntity(r.ent.id))
-      b.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          selectEntity(r.ent.id)
-        }
+    const countryMode = current.level === 'country'
+    beacons = current.rows
+      .filter((r) => r.ent.lat != null && r.ent.lng != null)
+      .map((r) => {
+        const b = document.createElementNS(SVG_NS, 'g')
+        b.setAttribute('class', 'atlas_beacon')
+        b.setAttribute('tabindex', '0')
+        b.setAttribute('role', 'button')
+        b.setAttribute(
+          'aria-label',
+          `${r.ent.name}, ${fmt(r.value)}${unit(current.m)} in ${r.year}, rank ${r.rank} of ${current.rows.length}`
+        )
+        b.dataset.id = r.ent.id
+        const rad = radius(r)
+        b.innerHTML = `<circle class="atlas_beacon-halo" r="${rad + (current.many ? 4 : 7)}"/><circle class="atlas_beacon-dot" r="${rad}"/>`
+        b.style.setProperty('--beacon', BIN_VARS[r.bin])
+        if (current.m.kind === 'count' && !countryMode && !current.many)
+          b.classList.add('is-bubble')
+        b.addEventListener('mouseenter', () => setHot(r.ent.id))
+        b.addEventListener('mouseleave', () => setHot(null))
+        b.addEventListener('focus', () => setHot(r.ent.id))
+        b.addEventListener('blur', () => setHot(null))
+        b.addEventListener('click', () => selectEntity(r.ent.id))
+        b.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            selectEntity(r.ent.id)
+          }
+        })
+        g.appendChild(b)
+        return { b, r, rad }
       })
-      g.appendChild(b)
-      return { b, r, rad }
+    // Countries: fill land by score; cities: tint the countries that host one
+    const scored = new Map()
+    const hosts = new Set()
+    current.rows.forEach((r) => {
+      if (!r.ent.iso) return
+      if (countryMode) scored.set(r.ent.iso, r)
+      else hosts.add(r.ent.iso)
     })
-    // Countries: fill land by score; cities: tint countries that host one
-    const by = new Map(current.rows.map((r) => [r.ent.iso, r]))
     landPaths.forEach(({ f, p }) => {
-      const r = countryMode ? by.get(String(f.id)) : null
+      const r = scored.get(String(f.id))
       p.style.fill = r ? BIN_VARS[r.bin] : ''
       p.style.stroke = p.style.fill
       p.classList.toggle('is-scored', !!r)
+      p.classList.toggle('is-tracked', hosts.has(String(f.id)))
     })
     paintSelection()
     positionBeacons()
@@ -787,7 +863,7 @@ export default async function (elements) {
         w: x.rad * 2,
         h: x.rad * 2,
       }))
-    const limit = isSmall() ? 6 : 99
+    const limit = current.many ? 12 : isSmall() ? 6 : 99
     const ordered = [...beacons].sort((a, b) =>
       a.r.ent.id === state.entity
         ? -1
@@ -851,7 +927,7 @@ export default async function (elements) {
       tip.classList.remove('is-visible')
       return
     }
-    tip.innerHTML = `<strong>${esc(x.r.ent.name)}</strong><span>${esc(fmt(x.r.value))}${esc(unit(current.m))} · #${pad2(x.r.rank)}</span>`
+    tip.innerHTML = `<strong>${esc(x.r.ent.name)}</strong><span>${esc(fmt(x.r.value))}${esc(unit(current.m))} (${x.r.year}) · #${x.r.rank} of ${current.rows.length}</span>`
     tip.style.left = `${x.xy[0]}px`
     tip.style.top = `${x.xy[1] - x.rad - 8}px`
     tip.classList.add('is-visible')
@@ -888,7 +964,7 @@ export default async function (elements) {
     if (legend)
       legend.setAttribute(
         'aria-label',
-        `Color scale: darker is better. Range ${fmt(current.lo)} to ${fmt(current.hi)}${unit(current.m)}`
+        `Color scale in five steps by rank: darker ranks higher. Range ${fmt(current.lo)} to ${fmt(current.hi)}${unit(current.m)}`
       )
   }
 
@@ -947,16 +1023,15 @@ export default async function (elements) {
   )
   function renderProfile() {
     if (!profile) return
-    const list = entities()
-    const ent =
-      list.find((e) => e.id === state.entity) ||
-      list.find((e) => e.id === current.rows[0]?.ent.id)
-    if (!ent) return
+    const r =
+      current.rows.find((x) => x.ent.id === state.entity) || current.rows[0]
+    if (!r) return
+    const ent = r.ent
     fill(
       entitySelect,
-      [...list]
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((e) => [e.id, e.name]),
+      [...current.rows]
+        .sort((a, b) => a.ent.name.localeCompare(b.ent.name))
+        .map((x) => [x.ent.id, x.ent.name]),
       ent.id
     )
     const set = (sel, t) => {
@@ -965,28 +1040,59 @@ export default async function (elements) {
     }
     set(
       '[data-atlas-meta]',
-      ent.kind === 'city'
-        ? `${ent.country} · ${ent.region}`
-        : `${ent.region} · ${ent.members.length} ecosystem${ent.members.length > 1 ? 's' : ''}`
+      [ent.kind === 'city' ? ent.country : '', ent.region]
+        .filter(Boolean)
+        .join(' · ')
     )
-    const scores = list
-      .map((e) => ({ id: e.id, v: vitality(e) }))
-      .sort((a, b) => b.v - a.v)
-    set('[data-atlas-score]', fmt(vitality(ent)))
+    // Extra context line: industry (F15/F08) or the full set of numbers for
+    // measures published as several (a net is never read without its gross)
+    let extra = profile.querySelector('[data-atlas-extra]')
+    if (!extra) {
+      extra = document.createElement('p')
+      extra.className = 'atlas_meta'
+      extra.dataset.atlasExtra = ''
+      profile.querySelector('[data-atlas-meta]')?.after(extra)
+    }
+    const vs = current.m.variants
+    const lastRaw = r.last.x
+    extra.textContent = r.top
+      ? `${RANK_WORD[current.industryRank] || 'Leading'} industry ${r.year}: ${r.top}`
+      : vs && lastRaw.vals
+        ? vs
+            .map(
+              (v, i) =>
+                `${v.label.replace(/ \(.*\)/, '')}: ${fmt(lastRaw.vals[i])}`
+            )
+            .join(' · ')
+        : ''
+    extra.hidden = !extra.textContent
+    // Score slot: latest value (label carries its year); rank of N
+    const score = profile.querySelector('[data-atlas-score]')
+    if (score) {
+      score.textContent = fmt(r.value)
+      const label = score.parentElement?.querySelector('.atlas_label')
+      if (label) label.textContent = `Value ${r.year}`
+      score.title = `${fmt(r.value)}${unit(current.m)} in ${r.year}${r.n != null ? ` (n = ${r.n})` : ''}`
+    }
     const rankEl = profile.querySelector('[data-atlas-rank]')
     if (rankEl)
-      rankEl.innerHTML = `${scores.findIndex((s) => s.id === ent.id) + 1}<small>/${list.length}</small>`
+      rankEl.innerHTML = `${r.rank}<small>/${current.rows.length}</small>`
+    // Year by year (last 6 published years), bars scaled to this entity's own
+    // min-max so year-to-year differences stay visible
     const ul = profile.querySelector('[data-atlas-pillars]')
     if (ul) {
-      const own = pillarScores(ent)
+      const pts = r.series.slice(-6)
+      const vals = r.series.map((p) => p.value)
+      const lo = Math.min(...vals)
+      const span = Math.max(...vals) - lo
+      const pct = (v) => (span === 0 ? 60 : 6 + 94 * ((v - lo) / span))
       const prev = barWidths(ul)
-      ul.innerHTML = DATA.pillars
-        .map((name, i) => {
-          const rank =
-            list.map((e) => pillarScores(e)[i]).filter((v) => v > own[i])
-              .length + 1
-          return `<li class="atlas_pillar"><span class="atlas_pillar-name">${esc(name)}</span><span class="atlas_pillar-bar" aria-hidden="true"><span data-key="${i}" data-to="${own[i]}%"></span></span><span class="atlas_pillar-value">${own[i]} · #${pad2(rank)}</span></li>`
-        })
+      ul.setAttribute('aria-label', `${ent.name}, ${current.m.name} by year`)
+      ul.innerHTML = pts
+        .map(
+          (p) =>
+            `<li class="atlas_pillar"><span class="atlas_pillar-name">${p.year}${p.top && current.m.industryRanks ? ` · ${esc(p.top)}` : ''}</span><span class="atlas_pillar-bar" aria-hidden="true"><span data-key="${p.year}" data-to="${pct(p.value).toFixed(1)}%"></span></span><span class="atlas_pillar-value">${esc(fmt(p.value))}</span></li>`
+        )
         .join('')
       animateBars(ul, prev)
     }
@@ -1022,21 +1128,28 @@ export default async function (elements) {
         el.hidden = !t
       }
     }
+    // CMS card first (editable copy), JSON from the lab as fallback. Unit,
+    // direction and range follow the current selection (variants change them).
     set('block', d.block || block?.name || '')
-    set('unit', `Unit: ${d.unit || unitLabel(m.unit)}`)
+    set('unit', `Unit: ${unitLabel(m.unit)}`)
     set(
       'direction',
-      d.direction ||
-        (m.direction === 'lower' ? 'Lower is better' : 'Higher is better')
+      m.direction === 'lower' ? 'Lower is better' : 'Higher is better'
     )
-    set('name', d.name || m.name)
-    set('definition', d.definition || 'Definition coming soon.')
-    set('how', d.how ? `How it's built: ${d.how}` : '')
-    set('notes', d.notes || '')
-    const range = d.range || `${fmt(current.lo)}–${fmt(current.hi)}${unit(m)}`
+    set('name', `${d.name || m.name}${m.variant ? ` · ${m.variant}` : ''}`)
+    set('definition', d.definition || m.definition || 'Definition coming soon.')
+    const how = d.how || m.construction
+    set('how', how ? `How it's built: ${how}` : '')
+    set('notes', d.notes || m.caveat || '')
+    const range = current.rows.length
+      ? `${fmt(current.lo)}–${fmt(current.hi)}${unit(m)}`
+      : ''
     set(
       'source',
-      [d.source && `Source: ${d.source}`, `Observed range: ${range}`]
+      [
+        (d.source || m.source) && `Source: ${d.source || m.source}`,
+        range && `Observed range: ${range}`,
+      ]
         .filter(Boolean)
         .join(' · ')
     )
@@ -1309,80 +1422,101 @@ export default async function (elements) {
     })
   }
 
-  // Trend figure: country lines 2010-2025 + data table
+  // Trend figure: one line per location in the current view (top 8 by rank
+  // colored, the rest muted) + the full data table, locations x years
   function renderTrend() {
     const holder = drawer.querySelector('[data-atlas-trend]')
     const tableHolder = drawer.querySelector('[data-atlas-trend-table]')
     if (!holder) return
     const m = current.m
-    const tr = DATA.trend[m.key]
+    const rows = current.rows
     const title = drawer.querySelector('[data-trend-title]')
     const metaEl = drawer.querySelector('[data-trend-meta]')
-    const names = Object.keys(tr.series)
-    if (title) title.textContent = defs.get(m.key)?.name || m.name
+    const years = [
+      ...new Set(rows.flatMap((r) => r.series.map((p) => p.year))),
+    ].sort((a, b) => a - b)
+    if (title)
+      title.textContent = `${defs.get(m.key)?.name || m.name}${m.variant ? ` · ${m.variant}` : ''}`
+    const what = current.level === 'city' ? 'cities / metros' : 'countries'
     if (metaEl)
-      metaEl.textContent = `${unitLabel(m.unit)} · ${names.length} countries · ${tr.years[0]}-${tr.years[tr.years.length - 1]}`
-    const last = (n) => tr.series[n][tr.series[n].length - 1]
-    const sorted = [...names].sort((a, b) =>
-      m.direction === 'lower' ? last(a) - last(b) : last(b) - last(a)
-    )
-    const top = sorted.slice(0, TREND_COLORS.length)
+      metaEl.textContent = rows.length
+        ? `${unitLabel(m.unit)} · ${rows.length} ${what} · ${years[0]}-${years[years.length - 1]}`
+        : 'No data for this selection'
+    if (!rows.length) {
+      holder.innerHTML = ''
+      if (tableHolder) tableHolder.innerHTML = ''
+      return
+    }
+    const top = rows.slice(0, TREND_COLORS.length)
     const W = Math.max(320, holder.clientWidth || 800)
     const H = 360
-    const pad = { l: 44, r: 116, t: 16, b: 28 }
-    const all = names.flatMap((n) => tr.series[n])
-    const step = niceStep(Math.max(...all))
-    const yMax = Math.ceil(Math.max(...all) / step) * step
-    const x = (i) => pad.l + (i / (tr.years.length - 1)) * (W - pad.l - pad.r)
-    const y = (v) => H - pad.b - (v / yMax) * (H - pad.t - pad.b)
-    const line = (vals) =>
-      vals
-        .map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`)
+    const pad = { l: 52, r: 128, t: 16, b: 28 }
+    const all = rows.flatMap((r) => r.series.map((p) => p.value))
+    const lo0 = Math.min(0, ...all)
+    const hi0 = Math.max(0, ...all)
+    const step = niceStep(hi0 - lo0 || 1)
+    const yMin = Math.floor(lo0 / step) * step
+    const yMax = Math.ceil(hi0 / step) * step || step
+    const xi = new Map(years.map((y, i) => [y, i]))
+    const x = (yr) =>
+      pad.l +
+      (years.length > 1 ? xi.get(yr) / (years.length - 1) : 0.5) *
+        (W - pad.l - pad.r)
+    const y = (v) =>
+      H - pad.b - ((v - yMin) / (yMax - yMin)) * (H - pad.t - pad.b)
+    // Gaps in a series break the line instead of bridging missing years
+    const line = (pts) =>
+      pts
+        .map((p, i) => {
+          const gap = i && xi.get(p.year) - xi.get(pts[i - 1].year) > 1
+          return `${!i || gap ? 'M' : 'L'}${x(p.year).toFixed(1)},${y(p.value).toFixed(1)}`
+        })
         .join('')
     const ticks = Array.from(
-      { length: Math.round(yMax / step) + 1 },
-      (_, i) => step * i
+      { length: Math.round((yMax - yMin) / step) + 1 },
+      (_, i) => yMin + step * i
     )
     const legend = top
       .map(
-        (n, i) =>
-          `<span class="atlas-trend_key"><i style="background:${TREND_COLORS[i]}"></i>${esc(n)}</span>`
+        (r, i) =>
+          `<span class="atlas-trend_key"><i style="background:${TREND_COLORS[i]}"></i>${esc(r.ent.name)}</span>`
       )
       .join('')
-    // End labels, nudged apart vertically
     const ends = top
-      .map((n, i) => ({ n, i, y: y(last(n)) }))
+      .map((r, i) => ({ n: r.ent.name, i, y: y(r.value), x: x(r.year) }))
       .sort((a, b) => a.y - b.y)
     ends.forEach((e, k) => {
       if (k && e.y - ends[k - 1].y < 13) e.y = ends[k - 1].y + 13
     })
+    const tickFmt = (t) => fmt(Math.round(t * 1000) / 1000)
+    const yearEvery = Math.max(1, Math.ceil(years.length / 8))
     holder.innerHTML =
-      `<div class="atlas-trend_legend">${legend}<span class="atlas-trend_key"><i class="is-muted"></i>${names.length - top.length} more (listed in the table)</span></div>` +
-      `<svg class="atlas-trend_svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(`${m.name}, ${tr.years[0]} to ${tr.years[tr.years.length - 1]}, ${names.length} countries. Values in the table below.`)}">` +
+      `<div class="atlas-trend_legend">${legend}${rows.length > top.length ? `<span class="atlas-trend_key"><i class="is-muted"></i>${rows.length - top.length} more (listed in the table)</span>` : ''}</div>` +
+      `<svg class="atlas-trend_svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(`${m.name}, ${years[0]} to ${years[years.length - 1]}, ${rows.length} ${what}. Values in the table below.`)}">` +
       ticks
         .map(
           (t) =>
-            `<g class="atlas-trend_tick"><line x1="${pad.l}" x2="${W - pad.r}" y1="${y(t)}" y2="${y(t)}"/><text x="${pad.l - 8}" y="${y(t) + 4}" text-anchor="end">${fmt(Math.round(t * 100) / 100)}</text></g>`
+            `<g class="atlas-trend_tick"><line x1="${pad.l}" x2="${W - pad.r}" y1="${y(t)}" y2="${y(t)}"/><text x="${pad.l - 8}" y="${y(t) + 4}" text-anchor="end">${tickFmt(t)}</text></g>`
         )
         .join('') +
-      tr.years
+      years
         .map((yr, i) =>
-          i % 2 === 0
-            ? `<text class="atlas-trend_year" x="${x(i)}" y="${H - 6}" text-anchor="middle">${yr}</text>`
+          i % yearEvery === 0
+            ? `<text class="atlas-trend_year" x="${x(yr)}" y="${H - 6}" text-anchor="middle">${yr}</text>`
             : ''
         )
         .join('') +
-      sorted
+      rows
         .slice(top.length)
         .map(
-          (n) =>
-            `<path class="atlas-trend_line is-muted" d="${line(tr.series[n])}"/>`
+          (r) =>
+            `<path class="atlas-trend_line is-muted" d="${line(r.series)}"/>`
         )
         .join('') +
       top
         .map(
-          (n, i) =>
-            `<path class="atlas-trend_line" d="${line(tr.series[n])}" stroke="${TREND_COLORS[i]}"/>`
+          (r, i) =>
+            `<path class="atlas-trend_line" d="${line(r.series)}" stroke="${TREND_COLORS[i]}"/>`
         )
         .join('') +
       ends
@@ -1395,12 +1529,12 @@ export default async function (elements) {
     if (tableHolder) {
       tableHolder.className = 'atlas-trend_table'
       tableHolder.innerHTML =
-        `<table><caption class="u-sr-only">${esc(m.name)} by country and year</caption><thead><tr><th scope="col">Year</th>${sorted.map((n) => `<th scope="col">${esc(n)}</th>`).join('')}</tr></thead><tbody>` +
-        tr.years
-          .map(
-            (yr, i) =>
-              `<tr><th scope="row">${yr}</th>${sorted.map((n) => `<td>${fmt(tr.series[n][i])}</td>`).join('')}</tr>`
-          )
+        `<table><caption class="u-sr-only">${esc(m.name)} by location and year</caption><thead><tr><th scope="col">${current.level === 'city' ? 'City / metro' : 'Country'}</th>${years.map((yr) => `<th scope="col">${yr}</th>`).join('')}</tr></thead><tbody>` +
+        rows
+          .map((r) => {
+            const byYear = new Map(r.series.map((p) => [p.year, p.value]))
+            return `<tr><th scope="row">${esc(r.ent.name)}</th>${years.map((yr) => `<td>${byYear.has(yr) ? fmt(byYear.get(yr)) : ''}</td>`).join('')}</tr>`
+          })
           .join('') +
         '</tbody></table>'
     }
@@ -1410,6 +1544,8 @@ export default async function (elements) {
   function update() {
     fillControls()
     current = table()
+    if (state.entity && !current.rows.some((r) => r.ent.id === state.entity))
+      state.entity = null
     renderBeacons()
     renderLegend()
     renderRanking()
