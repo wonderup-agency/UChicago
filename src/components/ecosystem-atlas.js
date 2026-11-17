@@ -350,7 +350,10 @@ export default async function (elements) {
   const fill = (el, items, value) => {
     if (!el) return
     el.innerHTML = items
-      .map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`)
+      .map(
+        ([v, l, off]) =>
+          `<option value="${esc(v)}"${off ? ' disabled' : ''}>${esc(l)}</option>`
+      )
       .join('')
     el.value = value
     dropdowns.get(el)?.refresh()
@@ -389,13 +392,21 @@ export default async function (elements) {
     )
     const m = measure()
     fill(select('coverage'), OPTIONS.coverage, state.coverage)
-    fill(select('level'), OPTIONS.level, level())
+    // Level stays open even for country-only measures: the city option is
+    // listed but disabled with the reason, so the control never looks broken
+    fill(
+      select('level'),
+      OPTIONS.level.map(([v, l]) =>
+        v === 'city' && !m.cityLevel
+          ? [v, `${l} (not available, country data only)`, true]
+          : [v, l]
+      ),
+      level()
+    )
     lock(
       select('level'),
-      !m.cityLevel,
-      m.cityLevel
-        ? ''
-        : 'This measure is computed at country level only, so the city view is not available'
+      false,
+      m.cityLevel ? '' : 'This measure is computed at country level only'
     )
     fill(
       select('industry'),

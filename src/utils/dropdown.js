@@ -70,6 +70,7 @@ export function enhanceSelect(select) {
       li.setAttribute('role', 'option')
       li.dataset.value = o.value
       li.textContent = o.textContent
+      if (o.disabled) li.setAttribute('aria-disabled', 'true')
       return li
     })
     list.replaceChildren(...items)
@@ -82,9 +83,15 @@ export function enhanceSelect(select) {
     btn.title = select.title || ''
   }
 
-  function setActive(i) {
+  // Keyboard/hover skip disabled options (dir: 1 down, -1 up)
+  function setActive(i, dir = 1) {
     if (!items.length) return
-    active = (i + items.length) % items.length
+    const n = items.length
+    let k = (i + n) % n
+    for (let s = 0; s < n && items[k].hasAttribute('aria-disabled'); s++)
+      k = (k + dir + n) % n
+    if (items[k].hasAttribute('aria-disabled')) return
+    active = k
     items.forEach((li, k) => li.classList.toggle('is-active', k === active))
     list.setAttribute('aria-activedescendant', items[active].id)
     items[active].scrollIntoView({ block: 'nearest' })
@@ -115,6 +122,7 @@ export function enhanceSelect(select) {
 
   function choose(i) {
     const li = items[i]
+    if (li?.hasAttribute('aria-disabled')) return
     close()
     if (!li || li.dataset.value === select.value) return
     select.value = li.dataset.value
@@ -132,9 +140,9 @@ export function enhanceSelect(select) {
   list.addEventListener('keydown', (e) => {
     const k = e.key
     if (k === 'ArrowDown') setActive(active + 1)
-    else if (k === 'ArrowUp') setActive(active - 1)
+    else if (k === 'ArrowUp') setActive(active - 1, -1)
     else if (k === 'Home') setActive(0)
-    else if (k === 'End') setActive(items.length - 1)
+    else if (k === 'End') setActive(items.length - 1, -1)
     else if (k === 'Enter' || k === ' ') choose(active)
     else if (k === 'Escape') close()
     else if (k === 'Tab') return close(false)
@@ -154,7 +162,7 @@ export function enhanceSelect(select) {
   })
   list.addEventListener('pointermove', (e) => {
     const li = e.target.closest('.atlas_dd-option')
-    if (li) setActive(items.indexOf(li))
+    if (li && !li.hasAttribute('aria-disabled')) setActive(items.indexOf(li))
   })
   list.addEventListener('click', (e) => {
     const li = e.target.closest('.atlas_dd-option')

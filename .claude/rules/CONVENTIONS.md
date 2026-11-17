@@ -69,7 +69,7 @@ Components are registered in `src/components.js` as an array of `{ selector, imp
 
 ## Form controls
 
-- Dropdowns: build a native `<select>` in Webflow (with a `<label>`) and enhance it with `enhanceSelect()` from `src/utils/dropdown.js`. Keep reading/writing the `<select>` value and listening to its `change` event; call `refresh()` after rewriting its options or `disabled`.
+- Dropdowns: build a native `<select>` in Webflow (with a `<label>`) and enhance it with `enhanceSelect()` from `src/utils/dropdown.js`. Keep reading/writing the `<select>` value and listening to its `change` event; call `refresh()` after rewriting its options or `disabled`. Disabled `<option>`s render greyed out (`aria-disabled`) and are skipped by keyboard, hover and click.
 
 ## Error Handling
 

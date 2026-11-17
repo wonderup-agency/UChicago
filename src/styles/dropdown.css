@@ -84,6 +84,11 @@
 .atlas_dd-option.is-active {
   background: var(--_color---secondary--bright-blue-light);
 }
+.atlas_dd-option[aria-disabled='true'] {
+  color: var(--_color---neutral--mid-gray-2);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .atlas_dd-option[aria-selected='true'] {
   color: var(--_color---secondary--deep-blue);
   font-weight: 500;
