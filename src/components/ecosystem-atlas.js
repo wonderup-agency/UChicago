@@ -369,6 +369,7 @@ export default async function (elements) {
   // the round button, like closing a popup, and expands it back. The panel
   // shrinks with a clip-path into the button, then the freed space closes.
   const toggle = root.querySelector('[data-atlas-filters-toggle]')
+  let syncPanelSpace = () => {}
   const panel = root.querySelector('.atlas_panel')
   if (toggle && panel) {
     if (!panel.id) panel.id = 'atlas-panel'
@@ -380,6 +381,17 @@ export default async function (elements) {
     const full = 'inset(0px 0px 0px 0px round 24px)'
     const ease = 'cubic-bezier(0.22, 1, 0.36, 1)'
     let busy = false
+    // The open panel overlaps the bottom of the map (negative top margin).
+    // Collapsed to the round button it still sits over the map, so it keeps
+    // a bottom margin that holds the page below at the map's bottom edge.
+    const keepSpace = () => {
+      const overlap = -parseFloat(window.getComputedStyle(panel).marginTop) || 0
+      return Math.max(0, overlap - panel.getBoundingClientRect().height)
+    }
+    syncPanelSpace = () => {
+      if (panel.classList.contains('is-collapsed'))
+        panel.style.marginBottom = `${keepSpace()}px`
+    }
     const setOpen = (open) => {
       panel.classList.toggle('is-collapsed', !open)
       toggle.setAttribute('aria-expanded', String(open))
@@ -404,15 +416,20 @@ export default async function (elements) {
           .finished.then(() => {
             setOpen(false)
             const gap = box.height - panel.getBoundingClientRect().height
+            const keep = keepSpace()
+            panel.style.marginBottom = `${keep}px`
             return panel.animate(
-              [{ marginBottom: `${gap}px` }, { marginBottom: '0px' }],
+              [{ marginBottom: `${gap}px` }, { marginBottom: `${keep}px` }],
               { duration: 320, easing: ease }
             ).finished
           })
           .finally(() => (busy = false))
       } else {
-        const before = panel.getBoundingClientRect().height
+        const before =
+          panel.getBoundingClientRect().height +
+          (parseFloat(panel.style.marginBottom) || 0)
         setOpen(true)
+        panel.style.marginBottom = ''
         const box = panel.getBoundingClientRect()
         const clip = insetTo(toggle.getBoundingClientRect(), box)
         const gap = box.height - before
@@ -484,9 +501,9 @@ export default async function (elements) {
   let size = { w: 0, h: 0 }
   const isSmall = () => size.w < 768
 
-  // The whole globe stays in view: it sits on the bottom of the stage (above
-  // the part the filters panel overlaps) and grows as large as it can without
-  // touching the header text/controls that overlap the top of the stage.
+  // The whole globe fits the stage: it sits on the bottom of the stage and
+  // grows as large as it can without touching the header text/controls if
+  // they overlap the top of the stage. The filters panel floats over it.
   // Obstacles are measured in resize(), in stage coordinates.
   let obstacles = []
   let bottomInset = 0
@@ -503,10 +520,9 @@ export default async function (elements) {
         t: b.top - stageRect.top - gap,
         b: b.bottom - stageRect.top + gap,
       }))
-    const mt = panel
-      ? parseFloat(window.getComputedStyle(panel).marginTop) || 0
-      : 0
-    bottomInset = Math.max(0, -mt) + gap
+    // The filters panel floats over the lower part of the globe (collapse it
+    // to the round button to reveal the rest), so only a small gap is kept.
+    bottomInset = gap
   }
   function globeFit() {
     const { w, h } = size
@@ -1404,11 +1420,65 @@ export default async function (elements) {
     writeUrl()
   }
 
+  // Load animation, played once when the map scrolls into view: the map
+  // settles in from a slight zoom, then beacons pop in by rank and the
+  // labels fade in. Only opacity/transform on layers, so it stays cheap.
+  function playIntro() {
+    if (reduced || !svg.animate || !('IntersectionObserver' in window)) return
+    svg.style.opacity = '0'
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return
+        io.disconnect()
+        svg.style.opacity = ''
+        const [cx, cy] = proj.translate()
+        const mapG = layer('map')
+        mapG.style.transformBox = 'view-box'
+        mapG.style.transformOrigin = `${cx}px ${cy}px`
+        mapG.animate(
+          [
+            { opacity: 0, transform: 'scale(0.9)' },
+            { opacity: 1, transform: 'scale(1)' },
+          ],
+          { duration: 1200, easing: EASE_OUT }
+        )
+        const order = [...beacons].sort((a, b) => a.r.rank - b.r.rank)
+        order.forEach((x, i) =>
+          x.b.querySelectorAll('circle').forEach((c) => {
+            c.style.transformBox = 'fill-box'
+            c.style.transformOrigin = 'center'
+            c.animate(
+              [
+                { opacity: 0, transform: 'scale(0)' },
+                { opacity: 1, transform: 'scale(1)' },
+              ],
+              {
+                duration: 520,
+                delay: 450 + i * 45,
+                easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+                fill: 'backwards',
+              }
+            )
+          })
+        )
+        layer('labels').animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 500,
+          delay: 650 + order.length * 45,
+          easing: 'ease-out',
+          fill: 'backwards',
+        })
+      },
+      { threshold: 0.2 }
+    )
+    io.observe(stage)
+  }
+
   function resize() {
     const r = stage.getBoundingClientRect()
     if (!r.width || !r.height) return
     size = { w: r.width, h: r.height }
     measureFit(r)
+    syncPanelSpace()
     svg.setAttribute('viewBox', `0 0 ${size.w} ${size.h}`)
     apply(targetGeom(state.view))
     renderBeacons()
@@ -1425,6 +1495,7 @@ export default async function (elements) {
   resize()
   update()
   root.classList.add('is-ready')
+  playIntro()
   if (qs.get('tab')) openDrawer(qs.get('tab'))
 
   return {
