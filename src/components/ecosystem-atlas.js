@@ -26,6 +26,8 @@ import {
   geoNaturalEarth1Raw,
   geoOrthographicRaw,
   geoProjectionMutator,
+  geoClipAntimeridian,
+  geoClipCircle,
 } from 'd3-geo'
 import { feature, merge, mesh } from 'topojson-client'
 import { loadJson, reducedMotion } from '../utils/motion.js'
@@ -115,6 +117,34 @@ function blendProjection() {
   const p = mutate(alpha)
   p.alpha = (v) => (v === undefined ? alpha : (mutate((alpha = v)), p))
   return p
+}
+
+// Mid-morph the blended projection folds: the far side of the sphere maps
+// back over the near side. Along the equator x = (1-a)·k·λ + a·sin λ
+// (NaturalEarth1 ↔ Orthographic, k = 0.8707), so the horizontal scale is
+// dx/dλ = (1-a)·k + a·cos λ, which hits 0 at the fold. Clipping right at the
+// fold squeezes whatever sits there into thin slivers, so we clip where the
+// scale has only dropped to a fraction r of its centre value (r shrinks to 0
+// as the globe forms, landing exactly on the 90° horizon at alpha 1).
+// Returns radians, or null when there is no fold (plain antimeridian cut).
+function foldAngle(alpha) {
+  if (alpha >= 0.999) return Math.PI / 2
+  const k = 0.8707
+  const centre = (1 - alpha) * k + alpha
+  const r = 0.5 * Math.sqrt(1 - alpha)
+  const c = (r * centre - (1 - alpha) * k) / alpha
+  if (c <= -1) return null
+  return Math.max(Math.PI / 2, Math.acos(c))
+}
+// d3's clip circle alone (wider than a hemisphere) lets shapes that cross
+// the antimeridian wrap across the whole map as long straight lines. Cutting
+// at the antimeridian as well (as the flat map does) keeps every ring closed
+// on the visible side. At alpha 1 the antimeridian sits behind the globe.
+function morphClip(angle) {
+  if (angle === null) return geoClipAntimeridian
+  if (angle <= Math.PI / 2 + 1e-6) return geoClipCircle(angle)
+  const circle = geoClipCircle(angle)
+  return (sink) => circle(geoClipAntimeridian(sink))
 }
 
 // Copy text from the Measures CMS cards, keyed by data-def
@@ -489,21 +519,18 @@ export default async function (elements) {
       translate: p.translate(),
     }
   }
+  let clipAngle = Math.PI / 2
   function apply(g) {
     geom = g
+    clipAngle = foldAngle(g.alpha)
     proj
       .alpha(g.alpha)
       .rotate(g.rotate)
       .scale(g.scale)
       .translate(g.translate)
-      // Only clip once the globe is formed: d3's clip circle wider than a
-      // hemisphere (used mid-morph) leaves thin straight slivers across the
-      // land. Unclipped, the far side just tucks in at the rim and is cut at
-      // the end.
-      .clipAngle(g.alpha >= 0.999 ? 90 : null)
-    // Sphere outline/fill only make sense on the finished globe; CSS fades
-    // them in after the morph.
-    const globeness = g.alpha >= 0.999 ? 1 : 0
+      .preclip(morphClip(clipAngle))
+    // Sphere fill/outline (the globe rim) fade in as the map curves
+    const globeness = clamp((g.alpha - 0.25) / 0.6, 0, 1)
     sphereFill.setAttribute('d', path(sphere) || '')
     sphereFill.style.opacity = globeness
     sphereLine.setAttribute('d', path(sphere) || '')
@@ -512,9 +539,7 @@ export default async function (elements) {
     gratPath.style.opacity = globeness
     landBase.setAttribute('d', path(landAll) || '')
     landPaths.forEach(({ f, p }) => p.setAttribute('d', path(f) || ''))
-    // Borders render only in the stable flat / globe states (cleaner morph)
-    const stable = g.alpha < 0.02 || g.alpha > 0.98
-    bordersPath.setAttribute('d', stable ? path(borders) || '' : '')
+    bordersPath.setAttribute('d', path(borders) || '')
     positionBeacons()
   }
   let anim = 0
@@ -602,9 +627,9 @@ export default async function (elements) {
   let current = table()
   let beacons = []
   const visible = (ent) =>
-    geom.alpha < 0.5 ||
+    clipAngle === null ||
     geoDistance([ent.lng, ent.lat], [-geom.rotate[0], -geom.rotate[1]]) <
-      Math.PI / 2 - 0.04
+      clipAngle - 0.04
   function radius(r) {
     const k = isSmall() ? 0.75 : 1
     if (current.m.kind === 'count') {
@@ -777,96 +802,19 @@ export default async function (elements) {
 
   // ── View toggle ──────────────────────────────────────────────────
   const viewBtns = [...root.querySelectorAll('[data-atlas-view]')]
-  // Flat ↔ globe: a crossfade instead of a projection morph. The current
-  // map is frozen into a "ghost" copy that shrinks (or grows) and fades out
-  // while the new view fades and settles in, and beacons glide from old to
-  // new positions. The globe opens already centered (no spin).
-  // No intermediate projections, so nothing folds, clips or leaves lines.
-  const smooth = (t) => 1 - Math.pow(1 - t, 4) // easeOutQuart
-  const easeIO = (t) =>
-    t < 0.5 ? 8 * t * t * t * t : 1 - Math.pow(-2 * t + 2, 4) / 2
+  // Flat ↔ globe: one continuous projection morph (NaturalEarth1 ↔
+  // Orthographic, the d3 "projection mutator" technique) with rotation,
+  // scale and position interpolated on the same eased clock. foldAngle /
+  // morphClip keep the far side hidden at every frame, so nothing folds,
+  // jumps or leaves lines. The globe lands straight on its centered view.
   function setView(v, animate = true) {
     state.view = v
     viewBtns.forEach((b) =>
       b.setAttribute('aria-pressed', String(b.dataset.atlasView === v))
     )
     svg.classList.toggle('is-globe', v === 'globe')
-    const target = targetGeom(v)
     writeUrl()
-    cancelAnimationFrame(anim)
-    animToken++
-    svg.querySelectorAll('.atlas_ghost').forEach((g) => g.remove())
-    const mapG = layer('map')
-    mapG.removeAttribute('transform')
-    mapG.style.opacity = ''
-    if (!animate || reduced) {
-      apply(target)
-      placeLabels()
-      return
-    }
-    const toGlobe = v === 'globe'
-    const ghost = mapG.cloneNode(true)
-    ghost.removeAttribute('data-layer')
-    ghost.setAttribute('class', 'atlas_ghost')
-    ghost.setAttribute('aria-hidden', 'true')
-    svg.insertBefore(ghost, mapG)
-    const fromXY = new Map(beacons.map((x) => [x.r.ent.id, x.xy]))
-    // Zoom around the globe's center (where the flat map "wraps" into)
-    const globe = toGlobe ? target : geom
-    const [ox, oy] = globe.translate
-    const zoom = (k) =>
-      `translate(${ox} ${oy}) scale(${k}) translate(${-ox} ${-oy})`
-    const dur = 1100
-    // The new view is drawn once, already at its final (centered) rotation;
-    // only the crossfade, zoom and beacons animate.
-    apply(target)
-    moving = true
-    clearLabels()
-    const t0 = performance.now()
-    const step = (now) => {
-      const t = Math.min(1, (now - t0) / dur)
-      const e = smooth(t)
-      // old view: out fast; new view: in a beat later
-      const out = easeIO(Math.min(1, t / 0.55))
-      const inn = smooth(clamp((t - 0.12) / 0.88, 0, 1))
-      ghost.style.opacity = String(1 - out)
-      ghost.setAttribute(
-        'transform',
-        zoom(toGlobe ? 1 - 0.18 * out : 1 + 0.12 * out)
-      )
-      mapG.style.opacity = String(inn)
-      mapG.setAttribute(
-        'transform',
-        zoom(toGlobe ? 1.06 - 0.06 * inn : 0.94 + 0.06 * inn)
-      )
-      beacons.forEach((x) => {
-        const a = fromXY.get(x.r.ent.id)
-        const b = x.xy
-        if (a && b) {
-          x.b.style.display = ''
-          x.b.style.opacity = ''
-          x.b.setAttribute(
-            'transform',
-            `translate(${lerp(a[0], b[0], e).toFixed(1)},${lerp(a[1], b[1], e).toFixed(1)})`
-          )
-        } else if (a && !b) {
-          x.b.style.display = t < 0.5 ? '' : 'none'
-          x.b.style.opacity = String(1 - out)
-          x.b.setAttribute('transform', `translate(${a[0]},${a[1]})`)
-        } else if (b) x.b.style.opacity = String(inn)
-      })
-      if (t < 1) anim = requestAnimationFrame(step)
-      else {
-        ghost.remove()
-        mapG.removeAttribute('transform')
-        mapG.style.opacity = ''
-        beacons.forEach((x) => (x.b.style.opacity = ''))
-        apply(target)
-        moving = false
-        placeLabels()
-      }
-    }
-    anim = requestAnimationFrame(step)
+    animateTo(targetGeom(v), animate ? 1300 : 0)
   }
   viewBtns.forEach((b) =>
     b.addEventListener('click', () => setView(b.dataset.atlasView))

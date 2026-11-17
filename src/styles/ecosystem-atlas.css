@@ -181,9 +181,6 @@
     opacity: 0;
   }
 }
-.atlas_ghost {
-  pointer-events: none;
-}
 
 /* View toggle + filter toggle states */
 .atlas_view-btn[aria-pressed='true'] {
