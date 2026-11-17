@@ -779,8 +779,8 @@ export default async function (elements) {
   const viewBtns = [...root.querySelectorAll('[data-atlas-view]')]
   // Flat ↔ globe: a crossfade instead of a projection morph. The current
   // map is frozen into a "ghost" copy that shrinks (or grows) and fades out
-  // while the new view fades and settles in; the globe also spins the last
-  // few degrees into place and beacons glide from old to new positions.
+  // while the new view fades and settles in, and beacons glide from old to
+  // new positions. The globe opens already centered (no spin).
   // No intermediate projections, so nothing folds, clips or leaves lines.
   const smooth = (t) => 1 - Math.pow(1 - t, 4) // easeOutQuart
   const easeIO = (t) =>
@@ -816,22 +816,16 @@ export default async function (elements) {
     const [ox, oy] = globe.translate
     const zoom = (k) =>
       `translate(${ox} ${oy}) scale(${k}) translate(${-ox} ${-oy})`
-    const spin = toGlobe ? 28 : 0
     const dur = 1100
+    // The new view is drawn once, already at its final (centered) rotation;
+    // only the crossfade, zoom and beacons animate.
+    apply(target)
     moving = true
     clearLabels()
     const t0 = performance.now()
     const step = (now) => {
       const t = Math.min(1, (now - t0) / dur)
       const e = smooth(t)
-      apply(
-        toGlobe
-          ? {
-              ...target,
-              rotate: [target.rotate[0] + spin * (1 - e), target.rotate[1]],
-            }
-          : target
-      )
       // old view: out fast; new view: in a beat later
       const out = easeIO(Math.min(1, t / 0.55))
       const inn = smooth(clamp((t - 0.12) / 0.88, 0, 1))
