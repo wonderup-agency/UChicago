@@ -7,18 +7,18 @@
 
 ## What it does
 
-- Draws the map in `[data-atlas-stage]` as SVG. One projection blends NaturalEarth1 (flat) and Orthographic (globe); the view toggle animates between them. Drag rotates the globe.
+- Draws the map in `[data-atlas-stage]` as SVG. One projection blends NaturalEarth1 (flat) and Orthographic (globe); the view toggle animates between them in two steps so nothing folds over: flat → globe morphs facing the same longitude with the equator centered, then spins to the target view; globe → flat spins back to the flat map's center first, then unfolds. Sphere outline and graticule fade in only over the last 30% of the morph. Drag rotates the globe.
 - Beacons per ecosystem, colored in 5 steps with the `Map/Beacon *` variables (darker = better, inverted for "Lower is better"). Count measures (`kind: count`) draw as proportional bubbles. Coverage "Countries" (or a country-only measure) paints countries instead.
 - Labels avoid each other and the beacons; values use text colors for contrast.
-- Filters are native `<select>`s filled from the JSON: block, measure, coverage, industry, flow, level. Industry/flow/level apply mock multipliers (`factors`). Country-only measures lock coverage.
-- Ranking `<ol>` and profile card stay in sync with the map (hover highlights, click selects and centers the globe).
+- Filters are native `<select>`s filled from the JSON (block, measure, coverage, industry, flow, level) and enhanced into custom dropdowns by `src/utils/dropdown.js` (`enhanceSelect`). The `<select>` stays as the source of truth (hidden, `aria-hidden`); the trigger reuses its Webflow class (`atlas_select`, `atlas_profile-select`). Keyboard: Enter/Space/arrows open, arrows/Home/End move, letters type-ahead, Enter picks, Esc closes. Industry/flow/level apply mock multipliers (`factors`). Country-only measures lock coverage.
+- Ranking `<ol>` and profile card stay in sync with the map (hover highlights, click selects and centers the globe). Ranking and pillar bars animate from their previous width (or 0 on first load) to the new one, staggered 30ms per row (`animateBars`).
 - Measure Details band (`[data-atlas-measure]`) takes texts from the Measures CMS card with the same `data-def` key; falls back to the JSON name/unit.
 - Drawer (`[data-atlas-drawer]`): tabs Data scope / Methodology / Trend figure / Definitions & formulas, prev/next, Esc and overlay close, focus trap, arrow keys on tabs. Trend figure draws an SVG line chart + table. Definitions cards get block anchors, "Show on map" and "Read more".
 - Deep link: `?m=&e=&v=&b=&c=&i=&f=&l=&tab=`.
 
 ## JS-only classes (add to Prevent delete in Webflow)
 
-`is-ready`, `is-open`, `is-hot`, `is-selected`, `is-bubble`, `is-tracked`, `is-scored`, `is-strong`, `is-muted`, `is-visible`, `is-globe`, `is-dragging`, `is-atlas-drawer-open`
+`is-ready`, `is-open`, `is-active`, `is-hot`, `is-selected`, `is-bubble`, `is-tracked`, `is-scored`, `is-strong`, `is-muted`, `is-visible`, `is-globe`, `is-dragging`, `is-atlas-drawer-open`
 
 ## Replacing the mock
 

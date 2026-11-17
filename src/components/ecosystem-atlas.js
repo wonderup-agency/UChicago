@@ -29,6 +29,7 @@ import {
 } from 'd3-geo'
 import { feature } from 'topojson-client'
 import { loadJson, reducedMotion } from '../utils/motion.js'
+import { enhanceSelect } from '../utils/dropdown.js'
 import '../styles/ecosystem-atlas.css'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -280,12 +281,16 @@ export default async function (elements) {
   const vitality = (ent) => Math.round(mean(pillarScores(ent)) * 10) / 10
 
   // ── Controls ─────────────────────────────────────────────────────
+  // Native <select>s stay as the source of truth; enhanceSelect draws the
+  // custom dropdown on top and is refreshed after every option rewrite.
+  const dropdowns = new Map()
   const fill = (el, items, value) => {
     if (!el) return
     el.innerHTML = items
       .map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`)
       .join('')
     el.value = value
+    dropdowns.get(el)?.refresh()
   }
   function fillControls() {
     fill(
@@ -310,6 +315,7 @@ export default async function (elements) {
       cov.title = locked
         ? 'This measure is available at country level only'
         : ''
+      dropdowns.get(cov)?.refresh()
     }
     ;['industry', 'flow', 'level'].forEach((k) =>
       fill(select(k), DATA.options[k], state[k])
@@ -716,15 +722,37 @@ export default async function (elements) {
 
   // ── Ranking ──────────────────────────────────────────────────────
   const rankingList = root.querySelector('[data-atlas-ranking]')
+  // Bars grow from their previous width (or 0) to the new one, staggered
+  function animateBars(container, prev) {
+    const bars = [...container.querySelectorAll('[data-to]')]
+    bars.forEach((b) => {
+      b.style.transitionDuration = '0s'
+      b.style.width = prev.get(b.dataset.key) || '0%'
+    })
+    void container.offsetWidth
+    bars.forEach((b, i) => {
+      b.style.transitionDuration = ''
+      b.style.transitionDelay = reduced ? '0ms' : `${Math.min(i, 12) * 30}ms`
+      b.style.width = b.dataset.to
+    })
+  }
+  const barWidths = (container) =>
+    new Map(
+      [...container.querySelectorAll('[data-to]')].map((b) => [
+        b.dataset.key,
+        b.style.width,
+      ])
+    )
   function renderRanking() {
     if (!rankingList) return
+    const prev = barWidths(rankingList)
     rankingList.innerHTML = current.rows
       .map(
         (r) =>
           `<li class="atlas_row-item" data-id="${esc(r.ent.id)}"><button type="button" class="atlas_row" aria-pressed="${r.ent.id === state.entity}">` +
           `<span class="atlas_row-index">${pad2(r.rank)}</span>` +
           `<span class="atlas_row-name">${esc(r.ent.name)}</span>` +
-          `<span class="atlas_row-bar" aria-hidden="true"><span style="width:${Math.max(4, r.t * 100).toFixed(1)}%;background:${BIN_VARS[Math.max(2, r.bin)]}"></span></span>` +
+          `<span class="atlas_row-bar" aria-hidden="true"><span data-key="${esc(r.ent.id)}" data-to="${Math.max(4, r.t * 100).toFixed(1)}%" style="background:${BIN_VARS[Math.max(2, r.bin)]}"></span></span>` +
           `<span class="atlas_row-value">${esc(fmt(r.value))}</span>${icon('chevron', 16)}</button></li>`
       )
       .join('')
@@ -736,6 +764,7 @@ export default async function (elements) {
         selectEntity(id)
       )
     })
+    animateBars(rankingList, prev)
   }
 
   // ── Profile ──────────────────────────────────────────────────────
@@ -778,14 +807,16 @@ export default async function (elements) {
     const ul = profile.querySelector('[data-atlas-pillars]')
     if (ul) {
       const own = pillarScores(ent)
+      const prev = barWidths(ul)
       ul.innerHTML = DATA.pillars
         .map((name, i) => {
           const rank =
             list.map((e) => pillarScores(e)[i]).filter((v) => v > own[i])
               .length + 1
-          return `<li class="atlas_pillar"><span class="atlas_pillar-name">${esc(name)}</span><span class="atlas_pillar-bar" aria-hidden="true"><span style="width:${own[i]}%"></span></span><span class="atlas_pillar-value">${own[i]} · #${pad2(rank)}</span></li>`
+          return `<li class="atlas_pillar"><span class="atlas_pillar-name">${esc(name)}</span><span class="atlas_pillar-bar" aria-hidden="true"><span data-key="${i}" data-to="${own[i]}%"></span></span><span class="atlas_pillar-value">${own[i]} · #${pad2(rank)}</span></li>`
         })
         .join('')
+      animateBars(ul, prev)
     }
   }
 
@@ -1129,6 +1160,9 @@ export default async function (elements) {
   }
 
   fillControls()
+  root
+    .querySelectorAll('[data-atlas-filter], [data-atlas-entity]')
+    .forEach((el) => dropdowns.set(el, enhanceSelect(el)))
   viewBtns.forEach((b) =>
     b.setAttribute('aria-pressed', String(b.dataset.atlasView === state.view))
   )

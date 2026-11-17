@@ -67,6 +67,10 @@ Components are registered in `src/components.js` as an array of `{ selector, imp
 - No CSS-in-JS, no CSS modules
 - **Global styles** (site-wide, e.g. button hover states) live in `src/styles/` and are imported once from `global.js`. They only add behavior Webflow classes can't express (parent-hover, keyframes); the base look stays in Webflow classes/variables
 
+## Form controls
+
+- Dropdowns: build a native `<select>` in Webflow (with a `<label>`) and enhance it with `enhanceSelect()` from `src/utils/dropdown.js`. Keep reading/writing the `<select>` value and listening to its `change` event; call `refresh()` after rewriting its options or `disabled`.
+
 ## Error Handling
 
 - Components wrap in try/catch — a failing component doesn't break others

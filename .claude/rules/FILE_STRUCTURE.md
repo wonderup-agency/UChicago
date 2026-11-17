@@ -9,7 +9,11 @@
 │   │   └── global.js              Runs on every page before components load (imports global styles)
 │   ├── data/                      JSON fetched at runtime (emitted to dist/data/): ecosystem-map, particles, atlas (mock), atlas-world (110m TopoJSON)
 │   ├── styles/
-│   │   └── buttons.css            Button hover micro-interactions (Figma Button States)
+│   │   ├── buttons.css            Button hover micro-interactions (Figma Button States)
+│   │   └── dropdown.css           Custom dropdown popup (used by utils/dropdown.js)
+│   ├── utils/
+│   │   ├── motion.js              Shared motion + data helpers (loadJson, reducedMotion, countUp)
+│   │   └── dropdown.js            enhanceSelect(): native <select> → accessible custom dropdown
 │   └── pages/
 │       └── .gitkeep               Per-page standalone bundles go here
 │
