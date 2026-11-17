@@ -7,9 +7,10 @@
 
 ## What it does
 
-- Draws the map in `[data-atlas-stage]` as SVG. One projection blends NaturalEarth1 (flat) and Orthographic (globe); the view toggle animates between them in two steps so nothing folds over: flat → globe morphs facing the same longitude with the equator centered, then spins to the target view; globe → flat spins back to the flat map's center first, then unfolds. Sphere outline fades in only over the last 30% of the morph; the graticule is hidden (Figma shows a clean globe). Drag rotates the globe. Default globe view `GLOBE_HOME = [55, -38]` (North America left, Europe right); on desktop the globe radius is `min(0.8·stage height, 0.34·stage width)` with its top just under the header, so the panel covers its lower half.
+- Draws the map in `[data-atlas-stage]` as SVG. One projection blends NaturalEarth1 (flat) and Orthographic (globe); the view toggle animates between them in two steps so nothing folds over: flat → globe morphs facing the same longitude with the equator centered, then spins to the target view; globe → flat spins back to the flat map's center first, then unfolds. No clipping during the morph (d3's clip circle wider than a hemisphere leaves straight slivers across the land); the 90° clip and the sphere outline only apply once the globe is formed. Land is drawn as one merged silhouette + per-country fills (no stroke) + a borders mesh, so clipped edges never show as lines; borders render only in the stable states. The graticule is hidden (Figma shows a clean globe). Drag rotates the globe. Default globe view `GLOBE_HOME = [55, -38]` (North America left, Europe right); on desktop the globe radius is `min(0.8·stage height, 0.34·stage width)` with its top just under the header, so the panel covers its lower half.
 - Beacons per ecosystem, colored in 5 steps with the `Map/Beacon *` variables (darker = better, inverted for "Lower is better"). Count measures (`kind: count`) draw as proportional bubbles. Coverage "Countries" (or a country-only measure) paints countries instead.
 - Labels avoid each other and the beacons; values use text colors for contrast.
+- The round filter button (`[data-atlas-filters-toggle]`) collapses the whole panel (filters + results) into just the button, like closing a popup: a clip-path shrinks the panel into the button, then the freed space closes; expanding reverses it. State: `.atlas_panel.is-collapsed`, `aria-expanded` on the button. The second filter row is always visible.
 - Filters are native `<select>`s filled from the JSON (block, measure, coverage, industry, flow, level) and enhanced into custom dropdowns by `src/utils/dropdown.js` (`enhanceSelect`). The `<select>` stays as the source of truth (hidden, `aria-hidden`); the trigger reuses its Webflow class (`atlas_select`, `atlas_profile-select`). Keyboard: Enter/Space/arrows open, arrows/Home/End move, letters type-ahead, Enter picks, Esc closes. Industry/flow/level apply mock multipliers (`factors`). Country-only measures lock coverage.
 - The beacon of the entity shown in the profile (selected, or the leader) gets a white ring.
 - Ranking `<ol>` and profile card stay in sync with the map (hover highlights, click selects and centers the globe). Ranking and pillar bars animate from their previous width (or 0 on first load) to the new one, staggered 30ms per row (`animateBars`).
@@ -19,7 +20,7 @@
 
 ## JS-only classes (add to Prevent delete in Webflow)
 
-`is-ready`, `is-open`, `is-active`, `is-hot`, `is-selected`, `is-bubble`, `is-tracked`, `is-scored`, `is-strong`, `is-muted`, `is-visible`, `is-globe`, `is-dragging`, `is-atlas-drawer-open`
+`is-ready`, `is-open`, `is-active`, `is-collapsed`, `is-hot`, `is-selected`, `is-bubble`, `is-tracked`, `is-scored`, `is-strong`, `is-muted`, `is-visible`, `is-globe`, `is-dragging`, `is-atlas-drawer-open`
 
 ## Replacing the mock
 

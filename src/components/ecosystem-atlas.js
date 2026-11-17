@@ -27,7 +27,7 @@ import {
   geoOrthographicRaw,
   geoProjectionMutator,
 } from 'd3-geo'
-import { feature } from 'topojson-client'
+import { feature, merge, mesh } from 'topojson-client'
 import { loadJson, reducedMotion } from '../utils/motion.js'
 import { enhanceSelect } from '../utils/dropdown.js'
 import '../styles/ecosystem-atlas.css'
@@ -335,14 +335,68 @@ export default async function (elements) {
     })
   )
 
+  // Filter button collapses the whole panel (filters + results) into just
+  // the round button, like closing a popup, and expands it back. The panel
+  // shrinks with a clip-path into the button, then the freed space closes.
   const toggle = root.querySelector('[data-atlas-filters-toggle]')
-  const extra =
-    toggle && document.getElementById(toggle.getAttribute('aria-controls'))
-  if (toggle && extra) {
-    toggle.addEventListener('click', () => {
-      const open = toggle.getAttribute('aria-expanded') !== 'true'
+  const panel = root.querySelector('.atlas_panel')
+  if (toggle && panel) {
+    if (!panel.id) panel.id = 'atlas-panel'
+    toggle.setAttribute('aria-controls', panel.id)
+    toggle.setAttribute('aria-label', 'Hide filters and results')
+    const insetTo = (btnRect, boxRect) =>
+      `inset(${btnRect.top - boxRect.top}px ${boxRect.right - btnRect.right}px ` +
+      `${boxRect.bottom - btnRect.bottom}px ${btnRect.left - boxRect.left}px round 100px)`
+    const full = 'inset(0px 0px 0px 0px round 24px)'
+    const ease = 'cubic-bezier(0.22, 1, 0.36, 1)'
+    let busy = false
+    const setOpen = (open) => {
+      panel.classList.toggle('is-collapsed', !open)
       toggle.setAttribute('aria-expanded', String(open))
-      extra.hidden = !open
+      toggle.setAttribute(
+        'aria-label',
+        open ? 'Hide filters and results' : 'Show filters and results'
+      )
+    }
+    toggle.addEventListener('click', () => {
+      if (busy) return
+      const open = toggle.getAttribute('aria-expanded') !== 'true'
+      if (reduced || !panel.animate) return setOpen(open)
+      busy = true
+      if (!open) {
+        const box = panel.getBoundingClientRect()
+        const clip = insetTo(toggle.getBoundingClientRect(), box)
+        panel
+          .animate([{ clipPath: full }, { clipPath: clip }], {
+            duration: 380,
+            easing: ease,
+          })
+          .finished.then(() => {
+            setOpen(false)
+            const gap = box.height - panel.getBoundingClientRect().height
+            return panel.animate(
+              [{ marginBottom: `${gap}px` }, { marginBottom: '0px' }],
+              { duration: 320, easing: ease }
+            ).finished
+          })
+          .finally(() => (busy = false))
+      } else {
+        const before = panel.getBoundingClientRect().height
+        setOpen(true)
+        const box = panel.getBoundingClientRect()
+        const clip = insetTo(toggle.getBoundingClientRect(), box)
+        const gap = box.height - before
+        Promise.all([
+          panel.animate([{ clipPath: clip }, { clipPath: full }], {
+            duration: 420,
+            easing: ease,
+          }).finished,
+          panel.animate(
+            [{ marginBottom: `${-gap}px` }, { marginBottom: '0px' }],
+            { duration: 420, easing: ease }
+          ).finished,
+        ]).finally(() => (busy = false))
+      }
     })
   }
   document.querySelectorAll('[data-icon]').forEach((el) => {
@@ -354,6 +408,16 @@ export default async function (elements) {
   const world = feature(WORLD, WORLD.objects.countries).features.filter(
     (f) => f.id !== '010'
   )
+  // Land is drawn in three layers so clipped edges never show as lines:
+  // one merged silhouette (base fill), per-country paths only for colored
+  // countries (no stroke), and a borders mesh on top (lines, not outlines).
+  const geoms = WORLD.objects.countries.geometries.filter((g) => g.id !== '010')
+  const landAll = merge(WORLD, geoms)
+  const borders = mesh(
+    WORLD,
+    { type: 'GeometryCollection', geometries: geoms },
+    (a, b) => a !== b
+  )
   const trackedIso = new Set(ecos.map((e) => e.iso))
   const proj = blendProjection().precision(0.3)
   const path = geoPath(proj)
@@ -361,7 +425,7 @@ export default async function (elements) {
   svg.setAttribute('class', 'atlas_svg')
   svg.innerHTML =
     '<g data-layer="base"><path class="atlas_sphere-fill"/><path class="atlas_grat"/></g>' +
-    '<g data-layer="land"></g><path class="atlas_sphere"/>' +
+    '<path class="atlas_land"/><g data-layer="land"></g><path class="atlas_borders"/><path class="atlas_sphere"/>' +
     '<g data-layer="beacons"></g><g data-layer="labels" aria-hidden="true"></g>'
   stage.appendChild(svg)
   const tip = document.createElement('div')
@@ -372,6 +436,8 @@ export default async function (elements) {
   const sphereFill = svg.querySelector('.atlas_sphere-fill')
   const sphereLine = svg.querySelector('.atlas_sphere')
   const gratPath = svg.querySelector('.atlas_grat')
+  const landBase = svg.querySelector('.atlas_land')
+  const bordersPath = svg.querySelector('.atlas_borders')
   const landPaths = world.map((f) => {
     const p = document.createElementNS(SVG_NS, 'path')
     p.setAttribute(
@@ -430,19 +496,25 @@ export default async function (elements) {
       .rotate(g.rotate)
       .scale(g.scale)
       .translate(g.translate)
-      .clipAngle(
-        g.alpha <= 0.001 ? null : g.alpha >= 0.999 ? 90 : 180 - g.alpha * 90
-      )
-    // Sphere and graticule only read well once the shape is nearly round,
-    // so they fade in over the last part of the morph.
-    const globeness = clamp((g.alpha - 0.7) / 0.3, 0, 1)
+      // Only clip once the globe is formed: d3's clip circle wider than a
+      // hemisphere (used mid-morph) leaves thin straight slivers across the
+      // land. Unclipped, the far side just tucks in at the rim and is cut at
+      // the end.
+      .clipAngle(g.alpha >= 0.999 ? 90 : null)
+    // Sphere outline/fill only make sense on the finished globe; CSS fades
+    // them in after the morph.
+    const globeness = g.alpha >= 0.999 ? 1 : 0
     sphereFill.setAttribute('d', path(sphere) || '')
     sphereFill.style.opacity = globeness
     sphereLine.setAttribute('d', path(sphere) || '')
     sphereLine.style.opacity = globeness
     gratPath.setAttribute('d', path(grat) || '')
     gratPath.style.opacity = globeness
+    landBase.setAttribute('d', path(landAll) || '')
     landPaths.forEach(({ f, p }) => p.setAttribute('d', path(f) || ''))
+    // Borders render only in the stable flat / globe states (cleaner morph)
+    const stable = g.alpha < 0.02 || g.alpha > 0.98
+    bordersPath.setAttribute('d', stable ? path(borders) || '' : '')
     positionBeacons()
   }
   let anim = 0
@@ -585,6 +657,7 @@ export default async function (elements) {
     landPaths.forEach(({ f, p }) => {
       const r = countryMode ? by.get(String(f.id)) : null
       p.style.fill = r ? BIN_VARS[r.bin] : ''
+      p.style.stroke = p.style.fill
       p.classList.toggle('is-scored', !!r)
     })
     paintSelection()
