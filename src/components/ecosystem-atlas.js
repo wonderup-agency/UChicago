@@ -484,6 +484,54 @@ export default async function (elements) {
   let size = { w: 0, h: 0 }
   const isSmall = () => size.w < 768
 
+  // The whole globe stays in view: it sits on the bottom of the stage (above
+  // the part the filters panel overlaps) and grows as large as it can without
+  // touching the header text/controls that overlap the top of the stage.
+  // Obstacles are measured in resize(), in stage coordinates.
+  let obstacles = []
+  let bottomInset = 0
+  function measureFit(stageRect) {
+    const gap = 16
+    obstacles = ['.atlas_intro', '.atlas_controls']
+      .map((sel) => root.querySelector(sel))
+      .filter(Boolean)
+      .map((el) => el.getBoundingClientRect())
+      .filter((b) => b.width && b.bottom > stageRect.top)
+      .map((b) => ({
+        l: b.left - stageRect.left - gap,
+        r: b.right - stageRect.left + gap,
+        t: b.top - stageRect.top - gap,
+        b: b.bottom - stageRect.top + gap,
+      }))
+    const mt = panel
+      ? parseFloat(window.getComputedStyle(panel).marginTop) || 0
+      : 0
+    bottomInset = Math.max(0, -mt) + gap
+  }
+  function globeFit() {
+    const { w, h } = size
+    const cx = w / 2
+    const floor = h - bottomInset
+    const fits = (r) => {
+      const cy = floor - r
+      if (cy - r < 4) return false
+      return obstacles.every((o) => {
+        const dx = Math.max(o.l - cx, 0, cx - o.r)
+        const dy = Math.max(o.t - cy, 0, cy - o.b)
+        return dx * dx + dy * dy >= r * r
+      })
+    }
+    let lo = 40
+    let hi = Math.min(w / 2 - 8, floor / 2)
+    if (!fits(lo)) return { r: lo, cy: floor - lo }
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2
+      if (fits(mid)) lo = mid
+      else hi = mid
+    }
+    return { r: lo, cy: floor - lo }
+  }
+
   function targetGeom(view) {
     const { w, h } = size
     const ent = state.entity && entities().find((e) => e.id === state.entity)
@@ -493,15 +541,8 @@ export default async function (elements) {
         : geom.alpha > 0.5
           ? geom.rotate
           : GLOBE_HOME
-      // Desktop: large globe whose top sits just under the header and whose
-      // lower half is covered by the panel (Figma 38300)
-      const r = isSmall() ? Math.min(w, h) * 0.46 : Math.min(h * 0.8, w * 0.34)
-      return {
-        alpha: 1,
-        rotate,
-        scale: r,
-        translate: [w / 2, isSmall() ? h / 2 : h * 0.07 + r],
-      }
+      const { r, cy } = globeFit()
+      return { alpha: 1, rotate, scale: r, translate: [w / 2, cy] }
     }
     const p = geoNaturalEarth1().rotate([-10, 0])
     const pad = isSmall() ? 8 : 40
@@ -1367,6 +1408,7 @@ export default async function (elements) {
     const r = stage.getBoundingClientRect()
     if (!r.width || !r.height) return
     size = { w: r.width, h: r.height }
+    measureFit(r)
     svg.setAttribute('viewBox', `0 0 ${size.w} ${size.h}`)
     apply(targetGeom(state.view))
     renderBeacons()
