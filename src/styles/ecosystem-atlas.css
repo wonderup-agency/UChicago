@@ -332,6 +332,18 @@ html.is-atlas-drawer-open {
   opacity: 0.5;
   cursor: not-allowed;
 }
+/* Buttons with an injected arrow icon: text + icon on one line */
+.atlas-def_show,
+.atlas-drawer_anchor {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.atlas-def_show svg,
+.atlas-drawer_anchor svg,
+.atlas-def_more svg {
+  flex: none;
+}
 .atlas-def_more {
   display: inline-flex;
   align-items: center;

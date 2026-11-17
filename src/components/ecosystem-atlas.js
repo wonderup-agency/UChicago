@@ -68,10 +68,16 @@ const ICONS = {
     '<path d="M4 7h16M7 12h10M10 17h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
   close:
     '<path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+  // Bold arrows (3px at 24px), as in the Figma buttons ("Show on map", "Read more",
+  // block anchors, drawer rail)
   'arrow-right':
-    '<path d="M5 12h14m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M4 12h15M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="butt" stroke-linejoin="miter"/>',
   'arrow-left':
-    '<path d="M19 12H5m5-5-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    '<path d="M20 12H5m6-6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="butt" stroke-linejoin="miter"/>',
+  'arrow-up-right':
+    '<path d="M6 18 17.5 6.5M8 6h10v10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="butt" stroke-linejoin="miter"/>',
+  'arrow-down':
+    '<path d="M12 4v15m-6-6 6 6 6-6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="butt" stroke-linejoin="miter"/>',
   chevron:
     '<path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
 }
@@ -1375,13 +1381,16 @@ export default async function (elements) {
         d.card.id = `defs-${blockName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
         anchors?.insertAdjacentHTML(
           'beforeend',
-          `<a class="atlas-drawer_anchor" href="#${d.card.id}">${esc(blockName)} ↓</a>`
+          `<a class="atlas-drawer_anchor" href="#${d.card.id}"><span>${esc(blockName)}</span>${icon('arrow-down', 16)}</a>`
         )
       }
       const unitEl = d.card.querySelector('[data-def-field="unit"]')
       if (unitEl && d.unit) unitEl.textContent = `Unit: ${d.unit}`
       const show = d.card.querySelector('[data-def-show]')
       if (show) {
+        // Webflow text ends with a "↗" character: swap it for the icon
+        const label = show.textContent.replace(/\s*[↗→]\s*$/, '').trim()
+        show.innerHTML = `<span>${esc(label)}</span>${icon('arrow-up-right', 16)}`
         show.disabled = !m
         show.title = m ? '' : 'No map data for this measure yet'
         show.addEventListener('click', () => {
