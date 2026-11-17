@@ -229,6 +229,9 @@
   scrollbar-width: thin;
 }
 .atlas_row {
+  /* no text selection on fast/double clicks */
+  user-select: none;
+  -webkit-user-select: none;
   display: grid;
   grid-template-columns: 1.75rem minmax(6rem, 9rem) 1fr 3.5rem 1rem;
   align-items: center;

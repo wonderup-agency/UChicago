@@ -1098,8 +1098,11 @@ export default async function (elements) {
     }
   }
 
+  // Clicking selects (never toggles off): a double click or a second click
+  // on the same row/beacon keeps it, instead of falling back to the leader
   function selectEntity(id) {
-    state.entity = state.entity === id ? null : id
+    if (state.entity === id) return
+    state.entity = id
     paintSelection()
     rankingList
       ?.querySelectorAll('[data-id]')
