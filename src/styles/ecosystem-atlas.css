@@ -310,6 +310,11 @@
 html.is-atlas-drawer-open {
   overflow: hidden;
 }
+/* The panel is a scrolling flex column: without this, tall content (the
+   trend table) makes the other children shrink, crushing the tab bar */
+.atlas-drawer_panel > * {
+  flex-shrink: 0;
+}
 .atlas-drawer_section > .eyebrow-component {
   margin-bottom: -0.75rem;
 }
