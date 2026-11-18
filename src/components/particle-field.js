@@ -7,14 +7,13 @@
 //    research it stays on the tabs graphic and scrolls away with it.
 // 2. Layers (everything after research: rivers, team): independent shapes
 //    anchored to their element, already formed when they enter the viewport.
-//    The background dust is off in the first sections: it fades in particle
-//    by particle (random order) once you scroll past research, and fades out
-//    the same way while a river is on screen.
+//    Each one fades in particle by particle (random order) when its section
+//    reaches the viewport. There is no background dust layer (Figma).
 //   hero      → looping shapes (ring → world → africa → south america → europe)
 //   flow      → river band (data-flow, data-dir="1|-1")
 //   research  → dotted region graphic (morphs between regions on tab change)
 //   team      → river bend inside the Team card
-//   dust/off  → traveler: dust/off states; layers: ignored (one dust layer)
+//   dust/off  → traveler: dust/off states; layers: ignored
 // Reduced motion: static shapes, no loop. No WebGL / software GPU: no canvas.
 // --------------------------------------------------
 import {
@@ -52,7 +51,6 @@ const P = {
 const KIND = { hero: 0, research: 1, band: 2, dust: 2, team: 2, off: 2 }
 const MOT = { hero: 1, research: 1, band: 0.9, dust: 1, team: 0.7, off: 1 }
 // Dust is a background layer: lighter on mobile.
-const DUST_OPACITY = { desktop: 1, mobile: 0.6 }
 const BAND_C = [
   -91.1, -88.9, -85.1, -80.2, -74.6, -68.2, -60.1, -50.3, -38.9, -26.4, -13.6,
   -0.9, 11.0, 21.8, 32.0, 41.6, 50.5, 58.2, 64.2, 68.0, 69.6, 68.9, 65.9, 60.7,
@@ -95,7 +93,7 @@ attribute vec4 aHeroA, aHeroB, aResA, aResB, aSeg, aRand;
 uniform float uTime, uDelay, uHeroBlend, uResBlend, uKind, uMot, uOpacity, uSwirl, uBreath, uDrift;
 uniform float uMouseR, uMouseF, uMouseK, uChaos, uPR, uPoint, uVel, uRiver, uRiverT;
 uniform float uBandC[37]; uniform float uBandW[37];
-uniform vec4 uAnc; uniform float uStart, uStartF, uReveal; uniform vec2 uHeroC, uRes, uMouse, uMouseSlow;
+uniform vec4 uAnc; uniform float uReveal; uniform vec2 uHeroC, uRes, uMouse, uMouseSlow;
 varying float vAlpha, vSize;
 ${NOISE}
 float ease(float t){ return t*t*t*(t*(t*6.0-15.0)+10.0); }
@@ -182,14 +180,11 @@ void main(){
   float drawn = max(size, 1.3);
   gl_PointSize = drawn*uPR;
   vSize = drawn*uPR;
-  // Dust only: hidden above the first layered section (the first sections
-  // keep their own traveling particles).
-  float keep = smoothstep(uStart - uStartF, uStart + uStartF, px.y);
-  // Dust only: each particle fades in/out at its own random moment while
-  // uReveal runs 0 → 1, so the background appears in random order.
+  // Layers: each particle fades in/out at its own random moment while
+  // uReveal runs 0 → 1, so the shape appears in random order.
   float seed = fract(aRand.y * 7.31 + aRand.w * 3.17) * 0.75;
   float reveal = smoothstep(seed, seed + 0.25, uReveal);
-  vAlpha = o * uOpacity * keep * reveal * min(1.0, (size*size)/(1.69));
+  vAlpha = o * uOpacity * reveal * min(1.0, (size*size)/(1.69));
 }`
 
 const TRAVEL_VERTEX = `
@@ -487,7 +482,7 @@ function buildStates(D) {
 //   research the particles stay on the tabs graphic and scroll away with it.
 // - layers: every anchor after research (rivers, team). Each is an
 //   independent shape anchored to its element; dust and off anchors are
-//   skipped (the dust is one background layer).
+//   skipped.
 // Consecutive research graphics (one per tab pane) collapse into one key that
 // always points at the visible pane.
 function collectKeys(mobile) {
@@ -523,10 +518,7 @@ function collectKeys(mobile) {
         ? k.els[0].closest('[data-component="research-tabs"]')
         : null
   })
-  // The background dust only starts below the research section.
-  const resKey = [...travel, ...layers].find((k) => k.type === 'research')
-  const section = resKey && resKey.els[0].closest('section')
-  return { travel, layers, startEl: section || null }
+  return { travel, layers }
 }
 
 export default async function (elements) {
@@ -604,7 +596,7 @@ export default async function (elements) {
   const position = new BufferAttribute(new Float32Array(N * 3), 3)
   const randAttr = new BufferAttribute(S.rand, 4)
 
-  const { travel, layers: layerKeys, startEl } = collectKeys(isMobile())
+  const { travel, layers: layerKeys } = collectKeys(isMobile())
 
   // ── 1. traveler: one particle set morphing hero → section 2 → research ──
   // Same shader and timeline as the original version. Its river keeps the
@@ -660,15 +652,12 @@ export default async function (elements) {
       uKind: { value: KIND[type] },
       uMot: { value: MOT[type] },
       uAnc: { value: new Vector4(0, 0, 1, 0) },
-      uOpacity: { value: 0 },
+      uOpacity: { value: 1 },
       uMouseK: { value: type === 'research' ? 0 : 1 },
-      // Shapes stay locked to their element; only the dust feels scroll drag.
-      uVel: type === 'dust' ? pageVel : noVel,
-      // Dust mask (unused by shapes: start far above).
-      uStart: { value: -1e6 },
-      uStartF: { value: 1 },
-      // Random-order reveal (dust only; shapes stay fully revealed).
-      uReveal: { value: type === 'dust' ? 0 : 1 },
+      // Shapes stay locked to their element (no scroll drag).
+      uVel: noVel,
+      // Random-order reveal, driven per frame (0 = hidden, 1 = formed).
+      uReveal: { value: 0 },
     }
     const material = new ShaderMaterial({
       transparent: true,
@@ -685,13 +674,10 @@ export default async function (elements) {
     return { geo, uniforms, points, opacity: 0 }
   }
 
-  const dust = makeLayer('dust', 'dust')
   layerKeys.forEach((k) => {
     const seg = k.type === 'band' ? 'band' : k.type === 'team' ? 'team' : 'off'
     k.layer = makeLayer(k.type, seg)
   })
-  // Rivers carry their own particles: the dust fades out around them.
-  const riverKeys = layerKeys.filter((k) => k.type === 'band')
   const heroGeos = [
     travelGeo,
     ...layerKeys.filter((k) => k.type === 'hero').map((k) => k.layer.geo),
@@ -779,7 +765,7 @@ export default async function (elements) {
     const t = travel[i].type
     if (KIND[t] === 2) travelGeo.setAttribute(slot, segAttr[t])
   }
-  // Layers switch on already formed while still outside the viewport.
+  // A negative pad means the element must be that far inside the viewport.
   const onScreen = (r, pad) =>
     r.bottom > -pad && r.top < window.innerHeight + pad && r.height > 0
 
@@ -834,12 +820,6 @@ export default async function (elements) {
   window.addEventListener('resize', resize)
   resize()
 
-  const toggle = (layer, on) => {
-    layer.opacity = on ? 1 : 0
-    layer.uniforms.uOpacity.value = layer.opacity
-    layer.points.visible = on
-  }
-
   // ── frame ────────────────────────────────────────────────────────
   let lastY = window.scrollY
   let vel = 0
@@ -851,7 +831,6 @@ export default async function (elements) {
     const dt = Math.min(0.05, (now - last) / 1000)
     last = now
     if (!reduced) time += dt
-    const vw = window.innerWidth
     const vh = window.innerHeight
 
     // 1. traveler
@@ -884,48 +863,19 @@ export default async function (elements) {
       TU.uSeg.value = seg
     }
 
-    // 2. background dust: fixed to the viewport, only below research,
-    //    cut out around the second river.
-    dust.uniforms.uAnc.value.set(
-      vw / 2,
-      vh / 2,
-      Math.max(vw / 1440, vh / 900),
-      0
-    )
-    if (startEl) {
-      dust.uniforms.uStart.value = startEl.getBoundingClientRect().bottom
-      dust.uniforms.uStartF.value = 60
-    }
-    // The dust is off until you reach the sections below research, and off
-    // again while a river is on screen (the river carries its own particles).
-    // On/off is not scroll-linked: once the state flips, every particle fades
-    // in (or out) at its own random moment over ~1.4s.
-    let riverIn = 0
-    riverKeys.forEach((k) => {
-      const h = k.el().getBoundingClientRect()
-      const enter = Math.min(1, Math.max(0, (vh + 150 - h.top) / 400))
-      const leave = Math.min(1, Math.max(0, (h.bottom + 150) / 400))
-      riverIn = Math.max(riverIn, enter * leave)
-    })
-    const dustBase = isMobile() ? DUST_OPACITY.mobile : DUST_OPACITY.desktop
-    const pastResearch =
-      !!startEl && startEl.getBoundingClientRect().bottom < vh * 0.6
-    const dustOn = pastResearch && riverIn < 0.35
-    const rv = dust.uniforms.uReveal
-    rv.value = reduced
-      ? +dustOn
-      : Math.min(1, Math.max(0, rv.value + (dustOn ? dt / 1.4 : -dt / 0.9)))
-    dust.opacity = dustBase
-    dust.uniforms.uOpacity.value = dustBase
-    dust.points.visible = rv.value > 0.001
-
-    // 3. layered shapes: on, already formed, before they reach the viewport
+    // 2. layered shapes (rivers, team): when their section reaches the
+    //    viewport every particle fades in at its own random moment (~1.4s),
+    //    and they fade out the same way once the section has left.
     layerKeys.forEach((k) => {
       const r = k.el().getBoundingClientRect()
-      const pad = k.type === 'band' ? vh * 0.6 : vh * 0.4
-      const show = onScreen(r, pad)
-      if (show) k.layer.uniforms.uAnc.value.set(...anchor(k))
-      toggle(k.layer, show)
+      const show = onScreen(r, -vh * 0.15)
+      const L = k.layer
+      const rv = L.uniforms.uReveal
+      rv.value = reduced
+        ? +show
+        : Math.min(1, Math.max(0, rv.value + (show ? dt / 1.4 : -dt / 0.8)))
+      L.points.visible = rv.value > 0.001
+      if (L.points.visible) L.uniforms.uAnc.value.set(...anchor(k))
     })
 
     if (loop.phase === 'morph') {
