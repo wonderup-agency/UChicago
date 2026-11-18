@@ -7,8 +7,9 @@
 //    research it stays on the tabs graphic and scrolls away with it.
 // 2. Layers (everything after research: rivers, team): independent shapes
 //    anchored to their element, already formed when they enter the viewport.
-//    The background dust only lives below research and fades out while a
-//    river is on screen.
+//    The background dust is off in the first sections: it fades in particle
+//    by particle (random order) once you scroll past research, and fades out
+//    the same way while a river is on screen.
 //   hero      → looping shapes (ring → world → africa → south america → europe)
 //   flow      → river band (data-flow, data-dir="1|-1")
 //   research  → dotted region graphic (morphs between regions on tab change)
@@ -94,7 +95,7 @@ attribute vec4 aHeroA, aHeroB, aResA, aResB, aSeg, aRand;
 uniform float uTime, uDelay, uHeroBlend, uResBlend, uKind, uMot, uOpacity, uSwirl, uBreath, uDrift;
 uniform float uMouseR, uMouseF, uMouseK, uChaos, uPR, uPoint, uVel, uRiver, uRiverT;
 uniform float uBandC[37]; uniform float uBandW[37];
-uniform vec4 uAnc; uniform float uStart, uStartF; uniform vec2 uHeroC, uRes, uMouse, uMouseSlow;
+uniform vec4 uAnc; uniform float uStart, uStartF, uReveal; uniform vec2 uHeroC, uRes, uMouse, uMouseSlow;
 varying float vAlpha, vSize;
 ${NOISE}
 float ease(float t){ return t*t*t*(t*(t*6.0-15.0)+10.0); }
@@ -184,7 +185,11 @@ void main(){
   // Dust only: hidden above the first layered section (the first sections
   // keep their own traveling particles).
   float keep = smoothstep(uStart - uStartF, uStart + uStartF, px.y);
-  vAlpha = o * uOpacity * keep * min(1.0, (size*size)/(1.69));
+  // Dust only: each particle fades in/out at its own random moment while
+  // uReveal runs 0 → 1, so the background appears in random order.
+  float seed = fract(aRand.y * 7.31 + aRand.w * 3.17) * 0.75;
+  float reveal = smoothstep(seed, seed + 0.25, uReveal);
+  vAlpha = o * uOpacity * keep * reveal * min(1.0, (size*size)/(1.69));
 }`
 
 const TRAVEL_VERTEX = `
@@ -662,6 +667,8 @@ export default async function (elements) {
       // Dust mask (unused by shapes: start far above).
       uStart: { value: -1e6 },
       uStartF: { value: 1 },
+      // Random-order reveal (dust only; shapes stay fully revealed).
+      uReveal: { value: type === 'dust' ? 0 : 1 },
     }
     const material = new ShaderMaterial({
       transparent: true,
@@ -827,14 +834,6 @@ export default async function (elements) {
   window.addEventListener('resize', resize)
   resize()
 
-  const fade = (layer, target, dt) => {
-    layer.opacity = reduced
-      ? target
-      : layer.opacity + (target - layer.opacity) * (1 - Math.exp(-dt * 6))
-    if (Math.abs(layer.opacity - target) < 0.002) layer.opacity = target
-    layer.uniforms.uOpacity.value = layer.opacity
-    layer.points.visible = layer.opacity > 0.002
-  }
   const toggle = (layer, on) => {
     layer.opacity = on ? 1 : 0
     layer.uniforms.uOpacity.value = layer.opacity
@@ -897,8 +896,10 @@ export default async function (elements) {
       dust.uniforms.uStart.value = startEl.getBoundingClientRect().bottom
       dust.uniforms.uStartF.value = 60
     }
-    // A river on screen: the dust fades out completely (scroll-linked) so
-    // only the river is visible, and comes back once the river has left.
+    // The dust is off until you reach the sections below research, and off
+    // again while a river is on screen (the river carries its own particles).
+    // On/off is not scroll-linked: once the state flips, every particle fades
+    // in (or out) at its own random moment over ~1.4s.
     let riverIn = 0
     riverKeys.forEach((k) => {
       const h = k.el().getBoundingClientRect()
@@ -907,7 +908,16 @@ export default async function (elements) {
       riverIn = Math.max(riverIn, enter * leave)
     })
     const dustBase = isMobile() ? DUST_OPACITY.mobile : DUST_OPACITY.desktop
-    fade(dust, dustBase * (1 - smoother(riverIn)), dt)
+    const pastResearch =
+      !!startEl && startEl.getBoundingClientRect().bottom < vh * 0.6
+    const dustOn = pastResearch && riverIn < 0.35
+    const rv = dust.uniforms.uReveal
+    rv.value = reduced
+      ? +dustOn
+      : Math.min(1, Math.max(0, rv.value + (dustOn ? dt / 1.4 : -dt / 0.9)))
+    dust.opacity = dustBase
+    dust.uniforms.uOpacity.value = dustBase
+    dust.points.visible = rv.value > 0.001
 
     // 3. layered shapes: on, already formed, before they reach the viewport
     layerKeys.forEach((k) => {
