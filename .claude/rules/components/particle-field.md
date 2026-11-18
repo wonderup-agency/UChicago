@@ -14,6 +14,7 @@ One fixed WebGL canvas (Three.js) behind the page, in two parts:
    - Research: the same particles form the region graphic of the active tab and morph on tab change (`research:change`). After research they stay on the graphic and scroll away with it.
    - A river placed before research (older layout) is also part of the traveler.
 2. **Layers** (every anchor after research: rivers, team): independent shapes anchored to their element. When the element is 15% inside the viewport, every particle fades in at its own random moment (`uReveal` 0 → 1 over ~1.4s, per-particle seed); it fades out the same way (~0.8s) once the element leaves. `dust`/`off` anchors are ignored here.
+   - Team: the river bend is clipped in the fragment shader to the `.home-card` that contains the anchor (rounded rect via `uClip` + `uClipR`, CSS px), so it reads as `overflow: hidden`. The avatars (`.team_bubble`) float gently via `cards.css`.
    - There is no background dust layer: Figma only has particles in the hero, research graphic, rivers and the Team card.
 
 ## Hero readability

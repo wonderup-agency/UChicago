@@ -29,3 +29,35 @@
     transition: none;
   }
 }
+
+/* Team card: the three avatars float very gently, each on its own rhythm
+   so they never move in sync. */
+.team_bubble {
+  animation: team-float 6s ease-in-out infinite;
+}
+
+.team_bubble.cc-2 {
+  animation-duration: 7.5s;
+  animation-delay: -2.5s;
+}
+
+.team_bubble.cc-3 {
+  animation-duration: 6.8s;
+  animation-delay: -4.2s;
+}
+
+@keyframes team-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -6px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team_bubble {
+    animation: none;
+  }
+}

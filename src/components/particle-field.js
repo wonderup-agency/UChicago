@@ -48,6 +48,8 @@ const P = {
   river: 16,
   riverBoost: 2.5,
 }
+// No clipping: a rect far larger than any screen.
+const NO_CLIP = [-1e4, -1e4, 1e4, 1e4]
 const KIND = { hero: 0, research: 1, band: 2, dust: 2, team: 2, off: 2 }
 const MOT = { hero: 1, research: 1, band: 0.9, dust: 1, team: 0.7, off: 1 }
 // Dust is a background layer: lighter on mobile.
@@ -290,9 +292,18 @@ void main(){
 }`
 
 const FRAGMENT = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 uniform vec3 uColor; varying float vAlpha, vSize;
+uniform vec4 uClip; uniform float uClipR, uPR; uniform vec2 uRes;
 void main(){
+  // Clip to a rounded rect in CSS px (Team card: particles stay inside it).
+  vec2 fp = vec2(gl_FragCoord.x / uPR, uRes.y - gl_FragCoord.y / uPR);
+  vec2 cq = abs(fp - (uClip.xy + uClip.zw) * 0.5) - (uClip.zw - uClip.xy) * 0.5 + uClipR;
+  if (length(max(cq, 0.0)) + min(max(cq.x, cq.y), 0.0) - uClipR > 0.0) discard;
   float d = length(gl_PointCoord-0.5);
   float a = clamp((0.5-d)*vSize + 0.5, 0.0, 1.0);
   if (a <= 0.0 || vAlpha < 0.004) discard;
@@ -612,6 +623,8 @@ export default async function (elements) {
     uToAnc: { value: new Vector4(0, 0, 1, 0) },
     uMot: { value: new Vector2(1, 1) },
     uVel: pageVel,
+    uClip: { value: new Vector4(...NO_CLIP) },
+    uClipR: { value: 0 },
   }
   const travelGeo = new BufferGeometry()
   travelGeo.setAttribute('position', position)
@@ -658,6 +671,9 @@ export default async function (elements) {
       uVel: noVel,
       // Random-order reveal, driven per frame (0 = hidden, 1 = formed).
       uReveal: { value: 0 },
+      // Clip rect (left, top, right, bottom) + corner radius, CSS px.
+      uClip: { value: new Vector4(...NO_CLIP) },
+      uClipR: { value: 0 },
     }
     const material = new ShaderMaterial({
       transparent: true,
@@ -875,7 +891,24 @@ export default async function (elements) {
         ? +show
         : Math.min(1, Math.max(0, rv.value + (show ? dt / 1.4 : -dt / 0.8)))
       L.points.visible = rv.value > 0.001
-      if (L.points.visible) L.uniforms.uAnc.value.set(...anchor(k))
+      if (L.points.visible) {
+        L.uniforms.uAnc.value.set(...anchor(k))
+        // Team: the river bend lives inside the card (overflow hidden).
+        const card = k.type === 'team' && k.el().closest('.home-card')
+        if (card) {
+          const c = card.getBoundingClientRect()
+          L.uniforms.uClip.value.set(
+            c.left + 1,
+            c.top + 1,
+            c.right - 1,
+            c.bottom - 1
+          )
+          if (k.clipR == null)
+            k.clipR =
+              parseFloat(window.getComputedStyle(card).borderTopLeftRadius) || 0
+          L.uniforms.uClipR.value = k.clipR
+        }
+      }
     })
 
     if (loop.phase === 'morph') {
