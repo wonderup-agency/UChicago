@@ -1,22 +1,28 @@
 // --------------------------------------------------
 // project-profile
 // --------------------------------------------------
-// One project panel for the Research page, filled from the CMS cards.
+// One detail panel filled from CMS cards. Used on Research (projects) and
+// News (articles); root[data-param] sets the URL param (default "project").
 //   [data-component="project-profile"]  panel root (dialog, person-modal shell)
 //   [data-project-card]                 card inside each Collection item
 //   [data-project-open]                 link inside the card ("Read more")
 //   [data-project-data]                 hidden sibling: slug, lead, CTA,
 //                                       body + milestones rich text, team
 //                                       ([data-team-member]) and regions
-// Opens on card click or ?project=<slug>. Prev/next walk the visible cards
+// News extras: [data-open-slug] (featured card) opens the panel too,
+// [data-featured-link] gets ?article=<slug>, [data-featured-author] shows the
+// first author, data-tag / data-status / data-date on the data block feed the
+// tags ("Type · Month YYYY") and data-cta2-* a second (outline) button.
+// Opens on card click or ?<param>=<slug>. Prev/next walk the visible cards
 // (research-filter hides the others). Esc / overlay closes, focus is trapped.
 // Shell motion and states come from people-profile.css (shared classes).
 // --------------------------------------------------
 import { reducedMotion } from '../utils/motion.js'
+import { formatDates, monthYear } from '../utils/date.js'
 import '../styles/people-profile.css'
 import '../styles/project-profile.css'
+import '../styles/list-row.css'
 
-const PARAM = 'project'
 const FOCUSABLE =
   'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
 const MAX_AVATARS = 3
@@ -48,38 +54,72 @@ function readProjects() {
           const img = m.querySelector('img')
           return {
             name: m.dataset.name || '',
+            role: m.dataset.role || '',
             img: img ? img.currentSrc || img.src : '',
             order: parseFloat(m.dataset.order) || 0,
           }
         })
         .filter((m) => m.name)
         .sort((a, b) => a.order - b.order)
+      const d = data.dataset
+      const status =
+        d.status || text(card.querySelector('[data-project-status]'))
       return {
         card,
         item,
         link: linkIn(card.querySelector('[data-project-open]')),
-        slug: data.dataset.slug || '',
-        name: text(card.querySelector('[data-project-name]')),
-        tag: text(card.querySelector('[data-project-tag]')),
-        status: text(card.querySelector('[data-project-status]')),
+        slug: d.slug || '',
+        name: text(
+          card.querySelector('[data-project-name]') ||
+            card.querySelector('.list-row_title')
+        ),
+        tag: d.tag || text(card.querySelector('[data-project-tag]')),
+        status: [status, monthYear(d.date)].filter(Boolean).join(' · '),
         lead:
           data.dataset.lead ||
           text(card.querySelector('[data-project-summary]')),
         body: richHtml(data.querySelector('[data-project-body]')),
         milestones: richHtml(data.querySelector('[data-project-milestones]')),
         cta: {
-          label: data.dataset.ctaLabel || '',
-          url: data.dataset.ctaLink || data.dataset.external || '',
+          label: d.ctaLabel || '',
+          url: d.ctaLink || d.external || '',
         },
+        cta2: { label: d.cta2Label || '', url: d.cta2Link || '' },
         team,
       }
     })
     .filter((p) => p && p.slug)
 }
 
+// Points a Button component (host with the attribute) at a URL + label.
+function buttonFor(host) {
+  const link = linkIn(host)
+  const texts = host ? [...host.querySelectorAll('.btn-text, .u-sr-only')] : []
+  return {
+    host,
+    set({ label, url }) {
+      const ok = Boolean(host && link && label && url)
+      if (host) host.hidden = !ok
+      if (!ok) return false
+      link.href = url
+      if (/^https?:\/\//.test(url)) {
+        link.target = '_blank'
+        link.rel = 'noopener'
+      } else {
+        link.removeAttribute('target')
+        link.removeAttribute('rel')
+      }
+      texts.forEach((el) => (el.textContent = label))
+      return true
+    },
+  }
+}
+
 export default function (elements) {
   const root = elements[0]
+  const PARAM = (root && root.dataset.param) || 'project'
   const projects = readProjects()
+  formatDates()
   if (!root || !projects.length) {
     console.warn('[project-profile] stopped: missing panel root or projects')
     return
@@ -93,6 +133,8 @@ export default function (elements) {
   const nameEl = $('[data-panel-name]')
   const tagEl = $('[data-panel-tag]')
   const statusEl = $('[data-panel-status]')
+  const tagWrap = $('[data-panel-tag-wrap]') || tagEl
+  const statusWrap = $('[data-panel-status-wrap]') || statusEl
   const teamEl = $('[data-panel-team]')
   const avatarsEl = $('[data-panel-avatars]')
   const authorsEl = $('[data-panel-authors]')
@@ -101,12 +143,9 @@ export default function (elements) {
   const milestonesWrap = $('[data-panel-milestones-wrap]')
   const milestonesEl = $('[data-panel-milestones]')
   const ctaWrap = $('[data-panel-cta-wrap]')
-  const ctaHost = $('[data-panel-cta]')
-  const ctaLink = linkIn(ctaHost)
   // Visible label (.btn-text, twice for the hover roll) + screen-reader label
-  const ctaTexts = ctaHost
-    ? [...ctaHost.querySelectorAll('.btn-text, .u-sr-only')]
-    : []
+  const cta = buttonFor($('[data-panel-cta]'))
+  const cta2 = buttonFor($('[data-panel-cta-2]'))
 
   root.querySelectorAll('button').forEach((b) => (b.type = 'button'))
   bodyEl?.classList.add('rich-text')
@@ -119,9 +158,9 @@ export default function (elements) {
   const fill = (p) => {
     nameEl.textContent = p.name
     tagEl.textContent = p.tag
-    tagEl.hidden = !p.tag
+    tagWrap.hidden = !p.tag
     statusEl.textContent = p.status
-    statusEl.hidden = !p.status
+    statusWrap.hidden = !p.status
 
     avatarsEl.replaceChildren()
     p.team.slice(0, MAX_AVATARS).forEach((m) => {
@@ -155,20 +194,9 @@ export default function (elements) {
     milestonesEl.innerHTML = p.milestones
     milestonesWrap.hidden = !p.milestones
 
-    const hasCta = Boolean(p.cta.label && p.cta.url && ctaLink)
-    if (ctaWrap) ctaWrap.hidden = !hasCta
-    if (hasCta) {
-      ctaLink.href = p.cta.url
-      const external = /^https?:\/\//.test(p.cta.url)
-      if (external) {
-        ctaLink.target = '_blank'
-        ctaLink.rel = 'noopener'
-      } else {
-        ctaLink.removeAttribute('target')
-        ctaLink.removeAttribute('rel')
-      }
-      ctaTexts.forEach((el) => (el.textContent = p.cta.label))
-    }
+    const has1 = cta.set(p.cta)
+    const has2 = cta2.host ? cta2.set(p.cta2) : false
+    if (ctaWrap) ctaWrap.hidden = !has1 && !has2
     panel.scrollTop = 0
   }
 
@@ -252,6 +280,47 @@ export default function (elements) {
     })
   })
 
+  // News featured card: same panel, opened from its own slug.
+  document.querySelectorAll('[data-open-slug]').forEach((el) => {
+    const p = projects.find((x) => x.slug === el.dataset.openSlug)
+    if (!p) return
+    const link = linkIn(el.querySelector('[data-featured-link]'))
+    if (link) {
+      link.href = urlFor(p.slug).toString()
+      link.setAttribute('aria-haspopup', 'dialog')
+      const sr = link.querySelector('.u-sr-only')
+      if (sr) sr.textContent = `Read the article: ${p.name}`
+    }
+    const author = el.querySelector('[data-featured-author]')
+    const first = p.team[0]
+    if (author) {
+      author.hidden = !first
+      if (first) {
+        const set = (sel, v) => {
+          const t = author.querySelector(sel)
+          if (t) t.textContent = v
+        }
+        set('[data-featured-author-name]', first.name)
+        set('[data-featured-author-role]', first.role)
+        const imgHost = author.querySelector('[data-featured-author-img]')
+        if (imgHost && first.img) {
+          const img = document.createElement('img')
+          img.src = first.img
+          img.alt = ''
+          img.loading = 'lazy'
+          imgHost.replaceChildren(img)
+        }
+      }
+    }
+    el.addEventListener('click', (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return
+      const a = e.target.closest('a')
+      if (a && a !== link) return
+      e.preventDefault()
+      show(p)
+    })
+  })
+
   root
     .querySelectorAll('[data-profile-close]')
     .forEach((el) => el.addEventListener('click', () => hide()))
@@ -289,7 +358,7 @@ export default function (elements) {
     else show(p, { push: false })
   })
 
-  // Deep link: /research?project=<slug>
+  // Deep link: /research?project=<slug>, /news?article=<slug>
   const initial = new window.URL(window.location.href).searchParams.get(PARAM)
   const start = projects.find((p) => p.slug === initial)
   if (start) show(start, { push: false })
