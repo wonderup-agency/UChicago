@@ -13,6 +13,9 @@
 //   flow      → river band (data-flow, data-dir="1|-1")
 //   research  → dotted region graphic (morphs between regions on tab change)
 //   team      → river bend inside the Team card
+//   arc       → secondary hero arc (Research header): always a layer, shape
+//               from Figma "Masked Hero asset", right-aligned and clipped to
+//               its frame like an overflow-hidden image
 //   dust/off  → traveler: dust/off states; layers: ignored
 // Reduced motion: static shapes, no loop. No WebGL / software GPU: no canvas.
 // --------------------------------------------------
@@ -50,8 +53,16 @@ const P = {
 }
 // No clipping: a rect far larger than any screen.
 const NO_CLIP = [-1e4, -1e4, 1e4, 1e4]
-const KIND = { hero: 0, research: 1, band: 2, dust: 2, team: 2, off: 2 }
-const MOT = { hero: 1, research: 1, band: 0.9, dust: 1, team: 0.7, off: 1 }
+const KIND = { hero: 0, research: 1, band: 2, dust: 2, team: 2, arc: 2, off: 2 }
+const MOT = {
+  hero: 1,
+  research: 1,
+  band: 0.9,
+  dust: 1,
+  team: 0.7,
+  arc: 0.6,
+  off: 1,
+}
 // Dust is a background layer: lighter on mobile.
 const BAND_C = [
   -91.1, -88.9, -85.1, -80.2, -74.6, -68.2, -60.1, -50.3, -38.9, -26.4, -13.6,
@@ -363,6 +374,7 @@ function buildStates(D) {
   const N = Math.max(...hero.map((h) => h.dots.length))
   const band = decode(D.band, 4)
   const team = decode(D.team, 4)
+  const arc = D.arc ? decode(D.arc, 4) : []
   const res = RES_KEYS.map((k) => decode(D.research[k], 4))
 
   const pack = (r, op) =>
@@ -473,6 +485,21 @@ function buildStates(D) {
   })
   const teamBuf = toBuf(teamItems)
 
+  // Arc: dots in Figma frame px (0..arcW, 0..arcH), spread over the
+  // particles by x like the team bend; the rest stay hidden.
+  const arcSorted = arc.slice().sort((a, b) => a.x - b.x)
+  const arcItems = [...Array(N)].map(() => ({
+    x: R() * (D.arc ? D.arc.w : 1),
+    y: R() * (D.arc ? D.arc.h : 1),
+    r: 1,
+    op: 0,
+    e: 1,
+  }))
+  arcSorted.forEach((d, j) => {
+    arcItems[byDustX[Math.floor(((j + 0.5) * N) / arcSorted.length)]] = d
+  })
+  const arcBuf = toBuf(arcItems)
+
   const rand = new Float32Array(N * 4)
   for (let i = 0; i < rand.length; i++) rand[i] = R()
 
@@ -481,7 +508,14 @@ function buildStates(D) {
     heroCenters: hero.map((h) => h.c),
     heroBufs,
     resBufs,
-    seg: { band: bandBuf, dust: dustBuf, team: teamBuf, off: offBuf },
+    seg: {
+      band: bandBuf,
+      dust: dustBuf,
+      team: teamBuf,
+      arc: arcBuf,
+      off: offBuf,
+    },
+    arcSize: D.arc ? [D.arc.w, D.arc.h] : [1, 1],
     rand,
   }
 }
@@ -505,6 +539,11 @@ function collectKeys(mobile) {
     let type = el.dataset.particlesState
     if (type === 'flow') type = 'band'
     if (!(type in KIND)) return
+    // The arc is a standalone header asset: never part of the traveler.
+    if (type === 'arc') {
+      layers.push({ type, els: [el], dir: 0 })
+      return
+    }
     // Research panes are consecutive: the group ends at the first non-research
     // anchor after it, which starts the layered part.
     if (type === 'research' && phase === 'before') phase = 'research'
@@ -691,7 +730,7 @@ export default async function (elements) {
   }
 
   layerKeys.forEach((k) => {
-    const seg = k.type === 'band' ? 'band' : k.type === 'team' ? 'team' : 'off'
+    const seg = ['band', 'team', 'arc'].includes(k.type) ? k.type : 'off'
     k.layer = makeLayer(k.type, seg)
   })
   const heroGeos = [
@@ -741,10 +780,19 @@ export default async function (elements) {
         return [r.left + r.width / 2, r.top + r.height / 2, r.width / 160, 0]
       case 'team':
         return [r.left + r.width / 2, r.top + r.height / 2, r.width / 1360, 2]
+      case 'arc': {
+        // Figma frame: 991 x 853 at x 608 of a 1440 page, top of the page.
+        // Scales with the viewport (capped), right-aligned, starts at the
+        // anchor's top. Dots are stored from the frame's top-left.
+        const s = arcScale()
+        return [vw - (1440 - 608) * s, r.top, s, 0]
+      }
       default:
         return [vw / 2, vh / 2, Math.max(vw / 1440, vh / 900), 0]
     }
   }
+  const arcScale = () =>
+    Math.min(1.25, window.innerWidth / 1440) * (isMobile() ? 1.6 : 1)
   const smoother = (t) => t * t * t * (t * (t * 6 - 15) + 10)
 
   // Traveler timeline: scroll position → index between travel anchors.
@@ -894,6 +942,16 @@ export default async function (elements) {
       if (L.points.visible) {
         L.uniforms.uAnc.value.set(...anchor(k))
         // Team: the river bend lives inside the card (overflow hidden).
+        if (k.type === 'arc') {
+          // Arc: clipped to its Figma frame (an overflow-hidden image).
+          const [ax, ay, as] = anchor(k)
+          L.uniforms.uClip.value.set(
+            ax,
+            ay,
+            ax + S.arcSize[0] * as,
+            ay + S.arcSize[1] * as
+          )
+        }
         const card = k.type === 'team' && k.el().closest('.home-card')
         if (card) {
           const c = card.getBoundingClientRect()

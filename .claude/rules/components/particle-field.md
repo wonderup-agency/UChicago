@@ -2,7 +2,7 @@
 
 `src/components/particle-field.js` + `src/styles/particle-field.css`. Data: `src/data/particles.json` (served from `dist/data/`).
 
-Webflow: `data-component="particle-field"` on the fixed `.particle-field` host. Shapes are anchored with `data-particles-state="hero|flow|research|dust|team|off"` (+ `data-dir="1|-1"` on flows).
+Webflow: `data-component="particle-field"` on the fixed `.particle-field` host. Shapes are anchored with `data-particles-state="hero|flow|research|dust|team|arc|off"` (+ `data-dir="1|-1"` on flows).
 
 ## How it works
 
@@ -19,7 +19,7 @@ One fixed WebGL canvas (Three.js) behind the page, in two parts:
 
 ## Other pages
 
-- Research (`/research`): its own `.particle-field` host (first child of `.page-wrapper`) and one river anchor (`.flow-divider[data-particles-state="flow"][data-dir="1"]`) at the end of the header section. With no research anchor on the page, the river is the whole traveler and scrolls away with the header.
+- Research (`/research`): its own `.particle-field` host and an `arc` anchor (`.particle-anchor[data-particles-state="arc"]`, absolute at the top of `.page-wrapper`, 53.3rem tall). The arc is the Figma "Masked Hero asset" (secondary hero tier, still a placeholder per the designer): 1,875 dots from the Union vector, stored in `particles.json` → `arc` (`n`, `w` 991, `h` 853, `b`) in frame px. It is always a layer (never part of the traveler): right-aligned, scale `min(1.25, vw/1440)` (×1.6 on mobile), clipped to its 991×853 frame via `uClip`, fades in like the other layers and breathes gently (`MOT` 0.6). The union lost per-dot opacity, so opacity is derived from dot size. To swap the final asset: re-export the node as SVG and rebuild the `arc` entry (circle subpaths → x, y, r, op).
 
 ## Hero readability
 
