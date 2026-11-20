@@ -102,3 +102,22 @@
 [data-panel-body] p {
   margin-bottom: 1rem;
 }
+
+/* News featured card author avatar (JS puts the photo inside) */
+[data-featured-author-img] {
+  overflow: hidden;
+}
+
+[data-featured-author-img] img {
+  width: 125%;
+  height: 125%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 50% 0;
+  margin-top: 25%;
+}
+
+[data-component='project-profile'] [hidden],
+[data-open-slug] [hidden] {
+  display: none !important;
+}

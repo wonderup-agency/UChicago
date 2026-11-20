@@ -1,0 +1,31 @@
+/* news-article: states Webflow classes can't express on /news/<slug>. */
+
+[data-component='news-article'] [hidden] {
+  display: none !important;
+}
+
+/* Authors list reads "By A, B and C" */
+.news-article_authors .w-dyn-item:not(:last-child) .news-article_author::after {
+  content: ',';
+}
+
+.news-article_authors
+  .w-dyn-item:nth-last-child(2)
+  .news-article_author::after {
+  content: ' and';
+}
+
+.news-article_authors .w-dyn-item:only-child .news-article_author::after,
+.news-article_authors .w-dyn-item:last-child .news-article_author::after {
+  content: none;
+}
+
+/* Body rich text subtitles (Figma H5), same as the panel */
+.news-article .rich-text h3,
+.news-article .w-richtext h3 {
+  margin: 2.5rem 0 1rem;
+  color: var(--_color---neutral--black);
+  font-size: var(--_typography---h5--font-size);
+  font-weight: 400;
+  line-height: 1.4;
+}

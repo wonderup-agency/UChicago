@@ -17,6 +17,10 @@ One fixed WebGL canvas (Three.js) behind the page, in two parts:
    - Team: the river bend is clipped in the fragment shader to the `.home-card` that contains the anchor (rounded rect via `uClip` + `uClipR`, CSS px), so it reads as `overflow: hidden`. The avatars (`.team_bubble`) float gently via `cards.css`.
    - There is no background dust layer: Figma only has particles in the hero, research graphic, rivers and the Team card.
 
+## Other pages
+
+- Research (`/research`): its own `.particle-field` host (first child of `.page-wrapper`) and one river anchor (`.flow-divider[data-particles-state="flow"][data-dir="1"]`) at the end of the header section. With no research anchor on the page, the river is the whole traveler and scrolls away with the header.
+
 ## Hero readability
 
 `particle-field.css` adds a soft white radial glow behind `.hero_content` (`::before`, `--_color---neutral--white` solid to 55%, opacity .96, `inset: -24% -20% 0%`, centered on the title and subtitle). `.hero_content` gets `position: relative` + `isolation: isolate` so the glow sits above the canvas and below the text. The hero secondary button (`.hero_btns` + secondary variant) gets a solid white background so particles never show through it; its hover tint is mixed on white so it stays opaque.

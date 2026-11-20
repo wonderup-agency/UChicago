@@ -14,6 +14,10 @@
 
 export default [
   {
+    selector: "[data-component='news-article']",
+    importFn: () => import('./components/news-article.js'),
+  },
+  {
     selector: "[data-component='research-filter']",
     importFn: () => import('./components/research-filter.js'),
   },

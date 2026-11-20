@@ -7,7 +7,9 @@
 //                                       "all" (or empty) shows everything
 //   [data-project-card]                 card inside each Collection item
 //   [data-region]                       region slugs inside the item's hidden
-//                                       [data-project-data] block
+//                                       [data-project-data] block (+ name in
+//                                       data-region-name)
+//   [data-project-regions]              row meta, filled with the names
 // Hides non-matching Collection items (project-profile skips hidden ones in
 // prev/next) and keeps ?region=<slug> in the URL.
 // --------------------------------------------------
@@ -21,9 +23,18 @@ export default function (elements) {
     const items = [...root.querySelectorAll('[data-project-card]')].map(
       (card) => {
         const item = card.closest('.w-dyn-item') || card.parentElement
-        const regions = [...item.querySelectorAll('[data-region]')]
+        const regionEls = [...item.querySelectorAll('[data-region]')]
+        const regions = regionEls
           .map((r) => r.getAttribute('data-region'))
           .filter(Boolean)
+        // Row meta shows the region names ("Africa, Asia"); Global if none.
+        const meta = card.querySelector('[data-project-regions]')
+        if (meta) {
+          const names = regionEls
+            .map((r) => r.getAttribute('data-region-name') || '')
+            .filter(Boolean)
+          if (names.length) meta.textContent = names.join(', ')
+        }
         return { item, regions }
       }
     )

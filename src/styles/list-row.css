@@ -1,0 +1,40 @@
+/* list-row: shared row pattern (Research projects, News recent articles).
+   Layout lives on the Webflow classes; this adds numbering and hover. */
+
+/* "01", "02"… for rows that have an empty .list-row_num */
+.w-dyn-items:has(.list-row_num) {
+  counter-reset: list-row;
+}
+
+.list-row_num::before {
+  counter-increment: list-row;
+  content: counter(list-row, decimal-leading-zero);
+}
+
+/* Whole row is clickable (project-profile); hint it */
+.list-row {
+  cursor: pointer;
+}
+
+.list-row_btn {
+  transition:
+    background-color 300ms ease,
+    color 300ms ease,
+    transform 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.list-row:hover .list-row_btn,
+.list-row:focus-within .list-row_btn {
+  transform: translateX(0.25rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-row_btn {
+    transition: none;
+  }
+
+  .list-row:hover .list-row_btn,
+  .list-row:focus-within .list-row_btn {
+    transform: none;
+  }
+}

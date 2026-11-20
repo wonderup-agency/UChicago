@@ -11,11 +11,14 @@
 │   ├── styles/
 │   │   ├── buttons.css            Button hover micro-interactions (Figma Button States)
 │   │   ├── dropdown.css           Custom dropdown popup (used by utils/dropdown.js)
+│   │   ├── list-row.css           Shared row pattern: numbering (01, 02…) + hover
+│   │   ├── news-article.css       News article template: authors commas, body subtitles
 │   │   ├── project-profile.css    Research project panel: avatars + milestones timeline
 │   │   └── research-filter.css    Research region filters: active state, arrow, card hover
 │   ├── utils/
 │   │   ├── motion.js              Shared motion + data helpers (loadJson, reducedMotion, countUp)
-│   │   └── dropdown.js            enhanceSelect(): native <select> → accessible custom dropdown
+│   │   ├── dropdown.js            enhanceSelect(): native <select> → accessible custom dropdown
+│   │   └── date.js                monthYear() / formatDates(): CMS dates → "Month YYYY"
 │   └── pages/
 │       └── .gitkeep               Per-page standalone bundles go here
 │
