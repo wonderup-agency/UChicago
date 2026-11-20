@@ -10,7 +10,9 @@
 │   ├── data/                      JSON fetched at runtime (emitted to dist/data/): ecosystem-map, particles, atlas (lab data, built by atlas-build), atlas-world (110m TopoJSON)
 │   ├── styles/
 │   │   ├── buttons.css            Button hover micro-interactions (Figma Button States)
-│   │   └── dropdown.css           Custom dropdown popup (used by utils/dropdown.js)
+│   │   ├── dropdown.css           Custom dropdown popup (used by utils/dropdown.js)
+│   │   ├── project-profile.css    Research project panel: avatars + milestones timeline
+│   │   └── research-filter.css    Research region filters: active state, arrow, card hover
 │   ├── utils/
 │   │   ├── motion.js              Shared motion + data helpers (loadJson, reducedMotion, countUp)
 │   │   └── dropdown.js            enhanceSelect(): native <select> → accessible custom dropdown

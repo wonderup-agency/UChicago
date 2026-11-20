@@ -14,6 +14,14 @@
 
 export default [
   {
+    selector: "[data-component='research-filter']",
+    importFn: () => import('./components/research-filter.js'),
+  },
+  {
+    selector: "[data-component='project-profile']",
+    importFn: () => import('./components/project-profile.js'),
+  },
+  {
     selector: "[data-component='ecosystem-atlas']",
     importFn: () => import('./components/ecosystem-atlas.js'),
   },

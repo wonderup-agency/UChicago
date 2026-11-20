@@ -1,0 +1,104 @@
+/* project-profile: markup the JS generates (avatars) and the milestones
+   timeline drawn on CMS rich text. The panel shell reuses person-modal_*
+   (states in people-profile.css). */
+
+/* Team avatars: 36px bubbles overlapping 8px, white ring */
+.project-avatar {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 2px solid var(--_color---neutral--white);
+  border-radius: 100px;
+  background-color: var(--_color---secondary--bright-blue-light);
+  color: var(--_color---secondary--deep-blue);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.project-avatar + .project-avatar {
+  margin-left: -0.5rem;
+}
+
+.project-avatar img {
+  width: 125%;
+  height: 125%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 50% 0;
+  margin-top: 25%;
+}
+
+/* Milestones: rich text <ul> → vertical timeline.
+   Each <li> = <strong>date</strong> text. */
+.project-panel_timeline ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-panel_timeline li {
+  position: relative;
+  margin: 0;
+  padding: 0 0 2.5rem 2.625rem;
+  color: var(--_color---neutral--mid-gray-2);
+  line-height: 1.6;
+}
+
+.project-panel_timeline li:last-child {
+  padding-bottom: 0;
+}
+
+/* dot */
+.project-panel_timeline li::before {
+  content: '';
+  position: absolute;
+  top: 0.1875rem;
+  left: 0.25rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 100px;
+  background-color: var(--_color---primary--maroon);
+}
+
+/* line to the next dot */
+.project-panel_timeline li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 0.75rem;
+  bottom: -0.75rem;
+  left: calc(0.8125rem - 1.5px);
+  width: 3px;
+  background-color: var(--_color---secondary--bright-blue-light);
+  z-index: -1;
+}
+
+.project-panel_timeline li {
+  z-index: 0;
+}
+
+.project-panel_timeline strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--_color---primary--maroon);
+  font-family: var(--_typography---eyebrow--font);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Body rich text: "What makes it different" style subtitles (Figma H5) */
+[data-panel-body] h3 {
+  margin: 2.5rem 0 1rem;
+  color: var(--_color---neutral--black);
+  font-size: var(--_typography---h5--font-size);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+[data-panel-body] p {
+  margin-bottom: 1rem;
+}
