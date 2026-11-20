@@ -1,0 +1,1 @@
+const t=new Intl.DateTimeFormat("en-US",{month:"long",year:"numeric",timeZone:"UTC"});function e(e){if(!e)return"";const n=Date.parse(e);return Number.isNaN(n)?"":t.format(new Date(n))}function n(t=document){t.querySelectorAll('[data-date-format="month"]').forEach(t=>{const n=e(t.dataset.date||t.textContent.trim());n&&(t.textContent=n)})}export{n as f,e as m};
